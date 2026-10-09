@@ -43,8 +43,8 @@ else:
 
 model.eval()
 
-# Grad-CAM on layer4 of ResNet-18
-grad_cam = GradCAM(model, model.resnet.layer4[-1])
+# Multi-Scale Grad-CAM++ on layer4 (semantic context) and layer3 (bilateral texture) of ResNet-18
+grad_cam = GradCAM(model, [model.resnet.layer4[-1], model.resnet.layer3[-1]])
 
 def determine_severity(confidence, heatmap_max):
     if confidence < 0.60:
