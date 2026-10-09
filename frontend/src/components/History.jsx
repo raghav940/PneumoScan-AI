@@ -79,6 +79,7 @@ export default function History() {
               <thead className="bg-white/5 backdrop-blur-md">
                 <tr>
                   <th className="py-4 px-6 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Timestamp</th>
+                  <th className="py-4 px-6 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Scan File</th>
                   <th className="py-4 px-6 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Prediction</th>
                   <th className="py-4 px-6 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Confidence</th>
                   <th className="py-4 px-6 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Severity</th>
@@ -97,13 +98,16 @@ export default function History() {
                         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                       })}
                     </td>
+                    <td className="py-4 px-6 whitespace-nowrap text-xs font-mono text-cyan-300 max-w-[160px] truncate">
+                      {record.image_name || 'X-Ray Scan'}
+                    </td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm font-bold">
                       <div className={`flex items-center gap-2 ${record.prediction === 'Pneumonia' ? 'text-red-400' : 'text-emerald-400'}`}>
                         {record.prediction === 'Pneumonia' ? <ShieldAlert size={16} /> : <CheckCircle size={16} />}
                         {record.prediction}
                       </div>
                     </td>
-                    <td className="py-4 px-6 whitespace-nowrap text-sm font-black text-gray-200">
+                    <td className="py-4 px-6 whitespace-nowrap text-sm font-black text-gray-200 font-mono">
                       {(record.confidence * 100).toFixed(1)}%
                     </td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm">

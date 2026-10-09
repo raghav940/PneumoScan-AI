@@ -9,7 +9,7 @@ import torch
 import torch.nn.functional as F
 
 from model import CNNModel
-from preprocess import preprocess_image
+from preprocess import preprocess_image, preprocess_image_bytes
 from grad_cam import GradCAM
 from db_models import db, User, PredictionRecord
 
@@ -104,18 +104,11 @@ def predict():
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
         
-    # Ensure uploads directory exists
-    uploads_dir = 'uploads'
-    os.makedirs(uploads_dir, exist_ok=True)
-    
-    # Save file with timestamp to prevent overwriting
-    filename = f"{user_id}_{int(time.time())}_{file.filename}"
-    file_path = os.path.join(uploads_dir, filename)
-    file.save(file_path)
+    image_bytes = file.read()
     
     try:
-        # Preprocess
-        input_tensor = preprocess_image(file_path)
+        # In-memory preprocessing without saving to server disk
+        input_tensor = preprocess_image_bytes(image_bytes)
         
         # Genuine Inference
         with torch.set_grad_enabled(True):
@@ -130,10 +123,10 @@ def predict():
             heatmap = grad_cam.generate_heatmap(input_tensor, predicted_class)
             severity = determine_severity(confidence, heatmap.max()) if predicted_class == 1 else "Normal"
             
-            # Save to Database
+            # Save metadata to Database
             record = PredictionRecord(
                 user_id=user_id,
-                image_path=file_path,
+                image_name=file.filename,
                 prediction=label,
                 confidence=confidence,
                 severity=severity
@@ -179,6 +172,7 @@ def history():
     for r in records:
         results.append({
             "id": r.id,
+            "image_name": getattr(r, 'image_name', None) or 'X-Ray Scan',
             "prediction": r.prediction,
             "confidence": r.confidence,
             "severity": r.severity,

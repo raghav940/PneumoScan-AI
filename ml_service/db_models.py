@@ -17,8 +17,8 @@ class PredictionRecord(db.Model):
     __tablename__ = 'predictions'
     
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    image_path = db.Column(db.String(255), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    image_name = db.Column(db.String(255), nullable=True)
     prediction = db.Column(db.String(50), nullable=False)
     confidence = db.Column(db.Float, nullable=False)
     severity = db.Column(db.String(50), nullable=False)
