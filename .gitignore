@@ -1,10 +1,23 @@
-# Environments
+# Environments and Secrets
 .env
+.env*.local
+*.env
+frontend/.env
+frontend/.env.development
+frontend/.env.production
+!.env.example
+!frontend/.env.example
 venv/
 env/
 ENV/
 env.bak/
 venv.bak/
+
+# Databases
+ml_service/instance/
+*.sqlite
+*.sqlite3
+instance/
 
 # Python
 __pycache__/

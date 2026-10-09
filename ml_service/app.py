@@ -17,15 +17,23 @@ app = Flask(__name__)
 CORS(app)
 
 # --- Configuration ---
-# Use Supabase / PostgreSQL URI if set (supports DATABASE_URL or POSTGRES_URI), fallback to SQLite
-database_url = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URI') or 'sqlite:///pneumoscan.db'
-# Render / Supabase provides 'postgresql://' or 'postgres://', force 'postgresql+psycopg2://' so SQLAlchemy uses psycopg2
+# Enforce pure PostgreSQL (Supabase / Cloud Postgres)
+database_url = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URI')
+if not database_url:
+    raise RuntimeError("CRITICAL: DATABASE_URL environment variable is required. Configure your Supabase/PostgreSQL connection string.")
+
+# Standardize dialect for SQLAlchemy + psycopg2
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql+psycopg2://', 1)
 elif database_url.startswith('postgresql://') and not database_url.startswith('postgresql+'):
     database_url = database_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
+
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    "pool_pre_ping": True,
+    "pool_recycle": 300,
+}
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'super-secret-jwt-key-pneumoscan-ai-secure-token-2026')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 86400  # 24 hours
 
