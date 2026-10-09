@@ -9,6 +9,7 @@ const Login = lazy(() => import('./components/Login'));
 const Register = lazy(() => import('./components/Register'));
 const Dashboard = lazy(() => import('./components/Dashboard'));
 const History = lazy(() => import('./components/History'));
+const Home = lazy(() => import('./components/Home'));
 
 function PageLoader() {
   return (
@@ -36,6 +37,7 @@ function App() {
             <Suspense fallback={<PageLoader />}>
               <AnimatePresence mode="wait">
                 <Routes>
+                  <Route path="/" element={<Home />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
                   <Route path="/dashboard" element={
@@ -48,7 +50,7 @@ function App() {
                       <History />
                     </PrivateRoute>
                   } />
-                  <Route path="/" element={<Navigate to="/dashboard" />} />
+                  <Route path="*" element={<Navigate to="/" />} />
                 </Routes>
               </AnimatePresence>
             </Suspense>

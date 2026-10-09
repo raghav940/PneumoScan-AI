@@ -79,7 +79,9 @@ export default function History() {
               <thead className="bg-white/5 backdrop-blur-md">
                 <tr>
                   <th className="py-4 px-6 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Timestamp</th>
+                  <th className="py-4 px-6 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Preview</th>
                   <th className="py-4 px-6 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Scan File</th>
+                  <th className="py-4 px-6 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Clinician</th>
                   <th className="py-4 px-6 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Prediction</th>
                   <th className="py-4 px-6 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Confidence</th>
                   <th className="py-4 px-6 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Severity</th>
@@ -98,8 +100,26 @@ export default function History() {
                         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                       })}
                     </td>
-                    <td className="py-4 px-6 whitespace-nowrap text-xs font-mono text-cyan-300 max-w-[160px] truncate">
+                    <td className="py-4 px-6 whitespace-nowrap">
+                      {record.image_url ? (
+                        <img 
+                          src={record.image_url} 
+                          alt="Thumbnail" 
+                          className="w-10 h-10 object-cover rounded-lg border border-cyan-500/40 shadow-sm"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-[10px] text-gray-500 font-mono">
+                          N/A
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-4 px-6 whitespace-nowrap text-xs font-mono text-cyan-300 max-w-[140px] truncate">
                       {record.image_name || 'X-Ray Scan'}
+                    </td>
+                    <td className="py-4 px-6 whitespace-nowrap text-xs font-mono text-gray-400">
+                      <span className="px-2 py-1 rounded bg-white/5 border border-white/10">
+                        {record.uploader || 'Clinician'}
+                      </span>
                     </td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm font-bold">
                       <div className={`flex items-center gap-2 ${record.prediction === 'Pneumonia' ? 'text-red-400' : 'text-emerald-400'}`}>

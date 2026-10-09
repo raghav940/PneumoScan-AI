@@ -14,13 +14,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install python dependencies (CPU-optimized PyTorch)
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir --retries 10 --timeout 120 torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir --retries 10 --timeout 120 -r requirements.txt
 
 # Copy backend code and model weights
 COPY . .
 
-# Hugging Face Spaces defaults to port 7860
+# Default port 7860, Render automatically sets $PORT (usually 10000)
+ENV PORT=7860
 EXPOSE 7860
 
-CMD ["gunicorn", "--bind", "0.0.0.0:7860", "--workers", "2", "--timeout", "120", "app:app"]
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-7860} --workers 2 --timeout 120 app:app"]
