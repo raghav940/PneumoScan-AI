@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { UserPlus, User, Lock, Network } from 'lucide-react';
+import { User, Lock, Network } from 'lucide-react';
+
+import API_BASE from '../utils/api';
 
 export default function Register() {
   const [username, setUsername] = useState('');
@@ -15,7 +17,7 @@ export default function Register() {
     e.preventDefault();
     setLoading(true);
     try {
-      await axios.post('http://127.0.0.1:5001/register', { username, password });
+      await axios.post(`${API_BASE}/register`, { username, password });
       navigate('/login');
     } catch (err) {
       setError(err.response?.data?.error || 'Initialization failed');

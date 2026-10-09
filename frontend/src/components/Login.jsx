@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LogIn, User, Lock, Cpu } from 'lucide-react';
+import { User, Lock, Cpu } from 'lucide-react';
+
+import API_BASE from '../utils/api';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -15,7 +17,7 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await axios.post('http://127.0.0.1:5001/login', { username, password });
+      const res = await axios.post(`${API_BASE}/login`, { username, password });
       localStorage.setItem('token', res.data.access_token);
       localStorage.setItem('username', res.data.username);
       navigate('/dashboard');

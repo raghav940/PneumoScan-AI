@@ -3,6 +3,8 @@ import axios from 'axios';
 import { motion } from 'framer-motion';
 import { History as HistoryIcon, Clock, Activity, ShieldAlert, CheckCircle } from 'lucide-react';
 
+import API_BASE from '../utils/api';
+
 export default function History() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -12,11 +14,11 @@ export default function History() {
     const fetchHistory = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await axios.get('http://127.0.0.1:5000/history', {
+        const res = await axios.get(`${API_BASE}/history`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         setHistory(res.data);
-      } catch (err) {
+      } catch {
         setError('Failed to fetch history.');
       } finally {
         setLoading(false);

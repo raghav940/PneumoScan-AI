@@ -5,6 +5,7 @@ import { UploadCloud, FileImage, Activity, AlertCircle, CheckCircle, ShieldAlert
 import { Canvas } from '@react-three/fiber';
 import LungModel from './LungModel';
 import { playProcessingHum, playSuccessPing } from '../utils/audio';
+import API_BASE from '../utils/api';
 
 export default function Dashboard() {
   const [compareMode, setCompareMode] = useState(false);
@@ -81,7 +82,7 @@ export default function Dashboard() {
     
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.post('http://127.0.0.1:5001/predict', formData, {
+      const res = await axios.post(`${API_BASE}/predict`, formData, {
         headers: { 
           'Content-Type': 'multipart/form-data',
           'Authorization': `Bearer ${token}`

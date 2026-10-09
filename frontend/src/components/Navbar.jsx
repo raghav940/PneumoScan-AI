@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Activity, LogOut, User, LayoutDashboard, History as HistoryIcon, Cpu } from 'lucide-react';
+import { LogOut, User, LayoutDashboard, History as HistoryIcon, Cpu } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function Navbar() {

@@ -20,7 +20,7 @@ CORS(app)
 # Use SQLite for quick local demo if POSTGRES_URI is not set
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('POSTGRES_URI', 'sqlite:///pneumoscan.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = 'super-secret-jwt-key'  # Change in production!
+app.config['JWT_SECRET_KEY'] = 'super-secret-jwt-key-pneumoscan-ai-secure-token-2026'  # Change in production!
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 3600  # 1 hour
 
 # Initialize Extensions
@@ -35,24 +35,22 @@ with app.app_context():
 model_path = 'pneumoscan.pt'
 model = CNNModel()
 if os.path.exists(model_path):
-    model.load_state_dict(torch.load(model_path, map_location='cpu'))
-    print("Model weights loaded successfully.")
+    model.load_weights(model_path, map_location='cpu')
+    print("Trained ResNet-18 model weights loaded successfully.")
 else:
     print("WARNING: Model weights not found. Using untrained model for inference testing.")
 
 model.eval()
 
-# Grad-CAM on the last conv layer of ResNet18
-grad_cam = GradCAM(model, model.model.layer4[-1])
+# Grad-CAM on layer4 of ResNet-18
+grad_cam = GradCAM(model, model.resnet.layer4[-1])
 
 def determine_severity(confidence, heatmap_max):
-    if confidence < 0.5:
-        return "Normal"
-    elif confidence < 0.7:
+    if confidence < 0.60:
         return "Mild"
-    elif confidence < 0.9:
+    elif confidence < 0.80:
         return "Moderate"
-    elif confidence < 0.98:
+    elif confidence < 0.95:
         return "Severe"
     else:
         return "Critical"
@@ -119,27 +117,10 @@ def predict():
         # Preprocess
         input_tensor = preprocess_image(file_path)
         
-        # Inference
+        # Genuine Inference
         with torch.set_grad_enabled(True):
             output = model(input_tensor)
-            
-            # For demonstration purposes, if the uploaded file is a known positive 
-            # (e.g. from the standard Kaggle dataset containing 'virus' or 'bacteria'),
-            # we ensure the model logits reflect this by adding a strong positive bias.
-            filename_lower = file.filename.lower()
-            if 'virus' in filename_lower or 'bacteria' in filename_lower or 'pneumonia' in filename_lower:
-                output[0][1] += 5.0 # Boost Pneumonia logit
-                output[0][0] -= 5.0 # Reduce Normal logit
-            else:
-                # Slight bias towards Normal for clear scans
-                output[0][0] += 2.0
-            
-            # Artificial temperature scaling to boost confidence for presentation
-            # T < 1 makes the probability distribution sharper (closer to 1.0 or 0.0)
-            temperature = 0.05 
-            scaled_output = output / temperature
-            
-            probabilities = F.softmax(scaled_output, dim=1)[0]
+            probabilities = F.softmax(output, dim=1)[0]
             
             predicted_class = torch.argmax(probabilities).item()
             confidence = probabilities[predicted_class].item()
