@@ -18,7 +18,7 @@ RUN pip install --no-cache-dir --timeout 60 \
     -r requirements.txt
 
 # Copy only production application code and weights
-COPY app.py model.py preprocess.py grad_cam.py db_models.py pneumoscan.pt ./
+COPY app.py model.py preprocess.py grad_cam.py db.py pneumoscan.pt ./
 
 # Default port 7860, Render automatically sets $PORT (usually 10000)
 ENV PORT=7860
