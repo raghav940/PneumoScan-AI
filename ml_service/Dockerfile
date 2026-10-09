@@ -6,19 +6,19 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Install system dependencies required for OpenCV headless
+# Install system dependencies required for OpenCV headless in one layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install python dependencies (CPU-optimized PyTorch)
+# Install python dependencies in a single cached pass
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir --retries 10 --timeout 120 torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir --retries 10 --timeout 120 -r requirements.txt
+RUN pip install --no-cache-dir --timeout 60 \
+    --extra-index-url https://download.pytorch.org/whl/cpu \
+    -r requirements.txt
 
-# Copy backend code and model weights
-COPY . .
+# Copy only production application code and weights
+COPY app.py model.py preprocess.py grad_cam.py db_models.py pneumoscan.pt ./
 
 # Default port 7860, Render automatically sets $PORT (usually 10000)
 ENV PORT=7860

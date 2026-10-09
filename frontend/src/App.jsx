@@ -1,10 +1,10 @@
 import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
-import Background3D from './components/Background3D';
 import { AnimatePresence } from 'framer-motion';
 import { Activity } from 'lucide-react';
 
+const Background3D = lazy(() => import('./components/Background3D'));
 const Login = lazy(() => import('./components/Login'));
 const Register = lazy(() => import('./components/Register'));
 const Dashboard = lazy(() => import('./components/Dashboard'));
@@ -28,7 +28,9 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen flex flex-col bg-[#030712] text-gray-200 relative overflow-hidden">
-        <Background3D />
+        <Suspense fallback={<div className="absolute inset-0 bg-[#030712] pointer-events-none" />}>
+          <Background3D />
+        </Suspense>
         <div className="relative z-10 flex-grow flex flex-col pointer-events-none">
           <div className="pointer-events-auto">
             <Navbar />
