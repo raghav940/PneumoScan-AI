@@ -171,6 +171,27 @@ def admin_update_user_role(target_user_id):
 
         return jsonify({"message": "User role updated successfully", "user": {"id": updated[0], "username": updated[1], "role": updated[2]}}), 200
 
+@app.route('/admin/users/<int:target_user_id>', methods=['DELETE'])
+@jwt_required()
+def admin_delete_user(target_user_id):
+    user_id = int(get_jwt_identity())
+    with get_db_cursor(commit=True) as cur:
+        cur.execute("SELECT role FROM users WHERE id = %s;", (user_id,))
+        caller = cur.fetchone()
+        if not caller or caller[0] != 'admin':
+            return jsonify({"error": "Unauthorized. Admin privileges required."}), 403
+
+        if target_user_id == user_id:
+            return jsonify({"error": "Cannot delete your own admin account."}), 400
+
+        cur.execute("DELETE FROM predictions WHERE user_id = %s;", (target_user_id,))
+        cur.execute("DELETE FROM users WHERE id = %s RETURNING id;", (target_user_id,))
+        deleted = cur.fetchone()
+        if not deleted:
+            return jsonify({"error": "User not found"}), 404
+
+        return jsonify({"message": f"User #{target_user_id} and all their records deleted successfully."}), 200
+
 @app.route('/admin/analytics', methods=['GET'])
 @jwt_required()
 def admin_get_analytics():
