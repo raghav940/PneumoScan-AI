@@ -3,6 +3,8 @@ import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { History as HistoryIcon, Clock, Activity, ShieldAlert, CheckCircle, X, Shield, Eye, FileText, User } from 'lucide-react';
 import API_BASE from '../utils/api';
+import HeatmapCanvas from './HeatmapCanvas';
+import DiagnosisBadge from './DiagnosisBadge';
 
 export default function History() {
   const [history, setHistory] = useState([]);
@@ -277,7 +279,11 @@ export default function History() {
                   </span>
                   <div className="w-full h-56 flex items-center justify-center">
                     {selectedRecord.grad_cam_coordinates ? (
-                      <canvas ref={modalCanvasRef} className="max-w-full max-h-56 object-contain rounded-lg shadow-lg border border-red-500/20" />
+                      <HeatmapCanvas 
+                        imageUrl={selectedRecord.image_url} 
+                        coordinates={selectedRecord.grad_cam_coordinates} 
+                        className="max-w-full max-h-56 object-contain rounded-lg shadow-lg border border-red-500/20"
+                      />
                     ) : (
                       <img 
                         src={selectedRecord.image_url} 
@@ -290,25 +296,12 @@ export default function History() {
               </div>
 
               {/* Diagnosis Badges */}
-              <div className="grid grid-cols-3 gap-3 mb-6">
-                <div className="bg-black/40 p-3 rounded-xl border border-cyan-900/40">
-                  <div className="text-[10px] text-gray-400 uppercase font-mono">Prediction</div>
-                  <div className={`text-base font-bold ${selectedRecord.prediction === 'Pneumonia' ? 'text-red-400' : 'text-emerald-400'}`}>
-                    {selectedRecord.prediction}
-                  </div>
-                </div>
-                <div className="bg-black/40 p-3 rounded-xl border border-cyan-900/40">
-                  <div className="text-[10px] text-gray-400 uppercase font-mono">Confidence</div>
-                  <div className="text-base font-bold text-white font-mono">
-                    {(selectedRecord.confidence * 100).toFixed(1)}%
-                  </div>
-                </div>
-                <div className="bg-black/40 p-3 rounded-xl border border-cyan-900/40">
-                  <div className="text-[10px] text-gray-400 uppercase font-mono">Severity</div>
-                  <div className="text-base font-bold text-cyan-300">
-                    {selectedRecord.severity}
-                  </div>
-                </div>
+              <div className="bg-black/50 p-4 rounded-xl border border-cyan-900/40 mb-6">
+                <DiagnosisBadge 
+                  prediction={selectedRecord.prediction} 
+                  confidence={selectedRecord.confidence} 
+                  severity={selectedRecord.severity} 
+                />
               </div>
 
               {/* Clinical Report & Recommendation */}

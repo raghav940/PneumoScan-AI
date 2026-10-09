@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { UploadCloud, FileImage, Activity, AlertCircle, CheckCircle, ShieldAlert, Cpu, GitCompare, Box } from 'lucide-react';
 import { Canvas } from '@react-three/fiber';
 import LungModel from './LungModel';
+import DiagnosisBadge from './DiagnosisBadge';
 import { playProcessingHum, playSuccessPing } from '../utils/audio';
 import API_BASE from '../utils/api';
 
@@ -251,44 +252,23 @@ export default function Dashboard() {
         </div>
 
         {result && (
-          <div className="mt-4 pt-4 border-t border-cyan-900/50 flex-shrink-0">
-             <div className="grid grid-cols-2 gap-2">
-                <div className="bg-[#020408]/80 p-2 rounded-xl border border-white/5 relative overflow-hidden">
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500"></div>
-                  <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1 font-mono">Status</p>
-                  <div className={`text-sm font-black uppercase tracking-wider flex items-center gap-1 ${result.prediction === 'Pneumonia' ? 'text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]' : 'text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]'}`}>
-                    {result.prediction === 'Pneumonia' ? <ShieldAlert size={16} /> : <CheckCircle size={16} />}
-                    {result.prediction}
-                  </div>
-                </div>
-                <div className="bg-[#020408]/80 p-2 rounded-xl border border-white/5 relative overflow-hidden">
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>
-                  <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1 font-mono">Confidence</p>
-                  <div className="text-sm font-black text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)] font-mono">
-                    {(result.confidence * 100).toFixed(1)}%
-                  </div>
-                </div>
-                 <div className={`col-span-2 p-2 rounded-xl flex items-center justify-between border ${getSeverityColor(result.severity)} relative overflow-hidden`}>
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite]"></div>
-                  <div>
-                    <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5 opacity-70 font-mono">Severity</p>
-                    <div className="text-sm font-black uppercase tracking-wider">{result.severity}</div>
-                  </div>
-                </div>
+          <div className="mt-4 pt-4 border-t border-cyan-900/50 flex-shrink-0 space-y-4">
+             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#020408]/80 p-3 rounded-xl border border-white/5">
+               <DiagnosisBadge prediction={result.prediction} confidence={result.confidence} severity={result.severity} />
              </div>
              
              {/* Clinical Report Section */}
              {result.summary && (
-               <div className="mt-4 pt-4 border-t border-cyan-900/50">
-                  <h4 className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest mb-2 flex items-center gap-2 font-mono">
-                    <Activity size={12} /> Clinical Report
+               <div>
+                  <h4 className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider mb-2 flex items-center gap-2 font-mono">
+                    <Activity size={13} /> Clinical Summary
                   </h4>
-                  <p className="text-xs text-gray-300 font-mono mb-3 leading-relaxed">
+                  <p className="text-xs text-gray-300 font-sans mb-3 leading-relaxed">
                     {result.summary}
                   </p>
                   <div className={`p-3 rounded-lg border ${result.prediction === 'Pneumonia' && (result.severity === 'Severe' || result.severity === 'Critical') ? 'bg-red-500/10 border-red-500/50 text-red-200' : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-200'}`}>
-                    <p className="text-[10px] font-bold uppercase tracking-widest mb-1 opacity-70 font-mono">Recommendation</p>
-                    <p className="text-xs font-mono">{result.suggestion}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider mb-1 opacity-80 font-mono">Recommendation</p>
+                    <p className="text-xs font-sans">{result.suggestion}</p>
                   </div>
                </div>
              )}
@@ -315,10 +295,17 @@ export default function Dashboard() {
 
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 relative z-10">
           <div className="flex items-center gap-3">
-            <Cpu className="text-cyan-400 bg-cyan-500/10 border border-cyan-500/50 p-2 rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.4)]" size={48} />
+            <Cpu className="text-cyan-400 bg-cyan-500/10 border border-cyan-500/50 p-2.5 rounded-2xl shadow-md" size={44} />
             <div>
-              <h2 className="text-3xl font-black text-white tracking-widest uppercase neon-text">Diagnostic HUD</h2>
-              <p className="text-xs text-cyan-400 tracking-[0.2em] uppercase font-mono mt-1">Primary Analysis Sequence</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-2xl sm:text-3xl font-black text-white tracking-wide">Diagnostic Dashboard</h2>
+                {localStorage.getItem('role') === 'admin' && (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-950/80 border border-purple-500/40 text-purple-300">
+                    ADMIN
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">AI-Assisted Chest Radiograph Analysis & Pathology Localization</p>
             </div>
           </div>
           
@@ -326,13 +313,13 @@ export default function Dashboard() {
           <div className="flex bg-black/50 p-1 rounded-xl border border-cyan-900/50">
             <button 
               onClick={() => setCompareMode(false)}
-              className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${!compareMode ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.3)]' : 'text-gray-500 hover:text-cyan-500'}`}
+              className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${!compareMode ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50' : 'text-gray-400 hover:text-cyan-300'}`}
             >
               Single Scan
             </button>
             <button 
               onClick={() => setCompareMode(true)}
-              className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all ${compareMode ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.3)]' : 'text-gray-500 hover:text-cyan-500'}`}
+              className={`px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${compareMode ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50' : 'text-gray-400 hover:text-cyan-300'}`}
             >
               <GitCompare size={14} /> Compare
             </button>
@@ -350,25 +337,25 @@ export default function Dashboard() {
             </div>
             
             <motion.button 
-              whileHover={!anyFile || anyLoading ? {} : { scale: 1.01, boxShadow: "0 0 25px rgba(6, 182, 212, 0.6)" }}
+              whileHover={!anyFile || anyLoading ? {} : { scale: 1.01 }}
               whileTap={!anyFile || anyLoading ? {} : { scale: 0.98 }}
               onClick={handleUploadAll} 
               disabled={!anyFile || anyLoading} 
-              className={`w-full py-4 rounded-xl font-black uppercase tracking-widest flex justify-center items-center gap-3 transition-all ${
+              className={`w-full py-4 rounded-xl font-bold uppercase tracking-wider flex justify-center items-center gap-3 transition-all ${
                 !anyFile || anyLoading 
                   ? 'bg-black/50 text-gray-600 cursor-not-allowed border border-white/5' 
-                  : 'bg-cyan-500 text-black border border-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.4)]'
+                  : 'bg-cyan-500 hover:bg-cyan-400 text-black border border-cyan-300 shadow-lg'
               }`}
             >
               {anyLoading ? (
                 <>
                   <Activity className="animate-spin" size={24} />
-                  Processing...
+                  Analyzing Radiograph...
                 </>
               ) : (
                 <>
                   <Activity size={24} />
-                  Initiate Scan Sequence
+                  Analyze Radiograph
                 </>
               )}
             </motion.button>

@@ -10,6 +10,7 @@ const Register = lazy(() => import('./components/Register'));
 const Dashboard = lazy(() => import('./components/Dashboard'));
 const History = lazy(() => import('./components/History'));
 const Home = lazy(() => import('./components/Home'));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
 
 function PageLoader() {
   return (
@@ -22,6 +23,14 @@ function PageLoader() {
 function PrivateRoute({ children }) {
   const token = localStorage.getItem('token');
   return token ? children : <Navigate to="/login" />;
+}
+
+function AdminRoute({ children }) {
+  const token = localStorage.getItem('token');
+  const role = localStorage.getItem('role');
+  if (!token) return <Navigate to="/login" />;
+  if (role !== 'admin') return <Navigate to="/dashboard" />;
+  return children;
 }
 
 function App() {
@@ -51,6 +60,11 @@ function App() {
                     <PrivateRoute>
                       <History />
                     </PrivateRoute>
+                  } />
+                  <Route path="/admin" element={
+                    <AdminRoute>
+                      <AdminDashboard />
+                    </AdminRoute>
                   } />
                   <Route path="*" element={<Navigate to="/" />} />
                 </Routes>

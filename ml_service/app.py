@@ -12,42 +12,21 @@ import torch.nn.functional as F
 from model import CNNModel
 from preprocess import preprocess_image, preprocess_image_bytes, validate_radiograph, generate_compressed_thumbnail
 from grad_cam import GradCAM
-from db_models import db, User, PredictionRecord
+from db import get_db_cursor, init_db
 
 app = Flask(__name__)
 CORS(app)
 
-# --- Configuration ---
-# Enforce pure PostgreSQL (Supabase / Cloud Postgres)
-database_url = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URI')
-if not database_url:
-    raise RuntimeError("CRITICAL: DATABASE_URL environment variable is required. Configure your Supabase/PostgreSQL connection string.")
-
-# Standardize dialect for SQLAlchemy + psycopg2
-if database_url.startswith('postgres://'):
-    database_url = database_url.replace('postgres://', 'postgresql+psycopg2://', 1)
-elif database_url.startswith('postgresql://') and not database_url.startswith('postgresql+'):
-    database_url = database_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
-
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    "pool_pre_ping": True,
-    "pool_recycle": 300,
-}
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'super-secret-jwt-key-pneumoscan-ai-secure-token-2026')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 86400  # 24 hours
-
-# Initialize Extensions
-db.init_app(app)
 jwt = JWTManager(app)
 
-# Ensure tables are created safely across workers
-with app.app_context():
-    try:
-        db.create_all()
-    except Exception:
-        pass
+# Initialize PostgreSQL Schema
+try:
+    init_db()
+    print("PostgreSQL tables and indexes verified successfully via psycopg2.")
+except Exception as e:
+    print(f"Database initialization notice: {e}")
 
 # Limit PyTorch CPU threads to 1 to reduce memory overhead on micro instances
 torch.set_num_threads(1)
@@ -84,6 +63,7 @@ def health_check():
     return jsonify({
         "status": "healthy",
         "service": "PneumoScan AI Diagnostics API",
+        "database": "PostgreSQL (psycopg2 direct)",
         "model_loaded": os.path.exists(model_path)
     }), 200
 
@@ -94,20 +74,27 @@ def register():
     data = request.get_json() or {}
     username = data.get('username', '').strip()
     password = data.get('password', '').strip()
-    role = data.get('role', 'user').strip()  # default to 'user', allow 'admin'
+    role = data.get('role', 'user').strip()  # default to 'user'
 
     if not username or not password:
         return jsonify({"error": "Username and password are required"}), 400
 
-    if User.query.filter_by(username=username).first():
-        return jsonify({"error": "Username already exists"}), 400
-
     password_hash = pbkdf2_sha256.hash(password)
-    new_user = User(username=username, password_hash=password_hash, role=role)
-    db.session.add(new_user)
-    db.session.commit()
 
-    return jsonify({"message": "User registered successfully", "role": new_user.role}), 201
+    try:
+        with get_db_cursor(commit=True) as cur:
+            cur.execute("SELECT id FROM users WHERE username = %s;", (username,))
+            if cur.fetchone():
+                return jsonify({"error": "Username already exists"}), 400
+
+            cur.execute(
+                "INSERT INTO users (username, password_hash, role) VALUES (%s, %s, %s) RETURNING id, role;",
+                (username, password_hash, role)
+            )
+            row = cur.fetchone()
+            return jsonify({"message": "User registered successfully", "id": row[0], "role": row[1]}), 201
+    except Exception as e:
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -115,16 +102,114 @@ def login():
     username = data.get('username', '').strip()
     password = data.get('password', '').strip()
 
-    user = User.query.filter_by(username=username).first()
-    if not user or not pbkdf2_sha256.verify(password, user.password_hash):
-        return jsonify({"error": "Invalid username or password"}), 401
+    try:
+        with get_db_cursor() as cur:
+            cur.execute("SELECT id, username, password_hash, role FROM users WHERE username = %s;", (username,))
+            user = cur.fetchone()
+            
+            if not user or not pbkdf2_sha256.verify(password, user[2]):
+                return jsonify({"error": "Invalid username or password"}), 401
 
-    access_token = create_access_token(identity=str(user.id))
-    return jsonify({
-        "access_token": access_token,
-        "username": user.username,
-        "role": getattr(user, 'role', 'user')
-    }), 200
+            access_token = create_access_token(identity=str(user[0]))
+            return jsonify({
+                "access_token": access_token,
+                "username": user[1],
+                "role": user[3]
+            }), 200
+    except Exception as e:
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
+
+# --- User Management (Admin Only) ---
+
+@app.route('/admin/users', methods=['GET'])
+@jwt_required()
+def admin_get_users():
+    user_id = int(get_jwt_identity())
+    with get_db_cursor() as cur:
+        cur.execute("SELECT role FROM users WHERE id = %s;", (user_id,))
+        caller = cur.fetchone()
+        if not caller or caller[0] != 'admin':
+            return jsonify({"error": "Unauthorized. Admin privileges required."}), 403
+
+        cur.execute("""
+            SELECT u.id, u.username, u.role, u.created_at, COUNT(p.id) as scan_count
+            FROM users u
+            LEFT JOIN predictions p ON p.user_id = u.id
+            GROUP BY u.id, u.username, u.role, u.created_at
+            ORDER BY u.created_at DESC;
+        """)
+        users = []
+        for r in cur.fetchall():
+            users.append({
+                "id": r[0],
+                "username": r[1],
+                "role": r[2],
+                "created_at": r[3].isoformat() + "Z" if r[3] else None,
+                "scan_count": r[4]
+            })
+        return jsonify(users), 200
+
+@app.route('/admin/users/<int:target_user_id>/role', methods=['PATCH'])
+@jwt_required()
+def admin_update_user_role(target_user_id):
+    user_id = int(get_jwt_identity())
+    with get_db_cursor(commit=True) as cur:
+        cur.execute("SELECT role FROM users WHERE id = %s;", (user_id,))
+        caller = cur.fetchone()
+        if not caller or caller[0] != 'admin':
+            return jsonify({"error": "Unauthorized. Admin privileges required."}), 403
+
+        data = request.get_json() or {}
+        new_role = data.get('role', 'user').strip()
+        if new_role not in ['admin', 'user']:
+            return jsonify({"error": "Invalid role. Must be 'admin' or 'user'."}), 400
+
+        cur.execute("UPDATE users SET role = %s WHERE id = %s RETURNING id, username, role;", (new_role, target_user_id))
+        updated = cur.fetchone()
+        if not updated:
+            return jsonify({"error": "User not found"}), 404
+
+        return jsonify({"message": "User role updated successfully", "user": {"id": updated[0], "username": updated[1], "role": updated[2]}}), 200
+
+@app.route('/admin/analytics', methods=['GET'])
+@jwt_required()
+def admin_get_analytics():
+    user_id = int(get_jwt_identity())
+    with get_db_cursor() as cur:
+        cur.execute("SELECT role FROM users WHERE id = %s;", (user_id,))
+        caller = cur.fetchone()
+        if not caller or caller[0] != 'admin':
+            return jsonify({"error": "Unauthorized. Admin privileges required."}), 403
+
+        # Aggregate hospital metrics
+        cur.execute("SELECT COUNT(*) FROM predictions;")
+        total_scans = cur.fetchone()[0]
+
+        cur.execute("SELECT COUNT(*) FROM users;")
+        total_users = cur.fetchone()[0]
+
+        cur.execute("SELECT COUNT(*) FROM predictions WHERE prediction = 'Pneumonia';")
+        pneumonia_count = cur.fetchone()[0]
+
+        cur.execute("SELECT COUNT(*) FROM predictions WHERE severity IN ('Severe', 'Critical');")
+        critical_count = cur.fetchone()[0]
+
+        cur.execute("SELECT AVG(confidence) FROM predictions;")
+        avg_confidence = cur.fetchone()[0] or 0.0
+
+        # Distribution by severity
+        cur.execute("SELECT severity, COUNT(*) FROM predictions GROUP BY severity;")
+        severity_dist = {r[0]: r[1] for r in cur.fetchall()}
+
+        return jsonify({
+            "total_scans": total_scans,
+            "total_users": total_users,
+            "pneumonia_count": pneumonia_count,
+            "normal_count": total_scans - pneumonia_count,
+            "critical_count": critical_count,
+            "avg_confidence": round(float(avg_confidence) * 100, 1),
+            "severity_distribution": severity_dist
+        }), 200
 
 # --- Prediction Routes ---
 
@@ -143,35 +228,34 @@ def predict():
         
     image_bytes = file.read()
     
-    # Validation Gate: Reject corrupted, non-radiographic, or blank uploads
-    is_valid, validation_error = validate_radiograph(image_bytes)
+    # Pre-upload Clinical Integrity Validation
+    is_valid, reason = validate_radiograph(image_bytes)
     if not is_valid:
-        return jsonify({"error": validation_error}), 400
-    
-    try:
-        # In-memory preprocessing without saving to local server disk
-        input_tensor = preprocess_image_bytes(image_bytes)
+        return jsonify({"error": f"Invalid radiograph: {reason}"}), 422
         
-        # Genuine Inference
-        with torch.set_grad_enabled(True):
-            output = model(input_tensor)
-            probabilities = F.softmax(output, dim=1)[0]
+    try:
+        tensor = preprocess_image_bytes(image_bytes)
+        
+        with torch.no_grad():
+            output = model(tensor)
+            probs = F.softmax(output, dim=1)
+            confidence, predicted = torch.max(probs, 1)
             
-            predicted_class = torch.argmax(probabilities).item()
-            confidence = probabilities[predicted_class].item()
+            label_idx = predicted.item()
+            confidence = float(confidence.item())
+            label = "Pneumonia" if label_idx == 1 else "Normal"
             
-            label = "Pneumonia" if predicted_class == 1 else "Normal"
+            # Layer-4 Grad-CAM Activation Map
+            heatmap = grad_cam.generate(tensor, target_class=label_idx)
+            severity = determine_severity(confidence, heatmap.max()) if label == "Pneumonia" else "Normal"
             
-            heatmap = grad_cam.generate_heatmap(input_tensor, predicted_class)
-            severity = determine_severity(confidence, heatmap.max()) if predicted_class == 1 else "Normal"
-            
-            # Generate lightweight compressed thumbnail (~3-5 KB) for permanent database preview
+            # Generate lightweight compressed thumbnail
             thumbnail_url = generate_compressed_thumbnail(image_bytes)
             
             # Clinical Summary and Suggestion Logic
             if severity == "Normal":
                 summary = "No abnormal opacities or consolidations detected in the lung fields. Clear cardiophrenic and costophrenic angles."
-                suggestion = "Routine monitoring. No immediate medical intervention required based on this scan."
+                suggestion = "Radiograph is consistent with clear respiratory fields. Routine preventative screening recommended."
             elif severity in ["Mild", "Moderate"]:
                 summary = "Patchy opacities detected, primarily indicative of early-stage or mild pneumonic infiltration."
                 suggestion = "Recommend clinical correlation and potential outpatient antibiotic therapy. Follow-up imaging in 7-14 days."
@@ -179,23 +263,22 @@ def predict():
                 summary = "Extensive dense consolidations obscuring significant portions of the lung fields, indicative of severe bilateral or lobar pneumonia."
                 suggestion = "URGENT: Recommend immediate hospitalization and aggressive medical intervention. Oxygen therapy and broad-spectrum IV antibiotics may be required."
 
-            # Save full report and coordinates to Database
-            record = PredictionRecord(
-                user_id=user_id,
-                image_name=file.filename,
-                image_url=thumbnail_url,
-                prediction=label,
-                confidence=confidence,
-                severity=severity,
-                summary=summary,
-                suggestion=suggestion,
-                grad_cam_data=json.dumps(heatmap.tolist())
-            )
-            db.session.add(record)
-            db.session.commit()
+            coords_json = json.dumps(heatmap.tolist())
+
+            # Save full report directly using psycopg2
+            with get_db_cursor(commit=True) as cur:
+                cur.execute("""
+                    INSERT INTO predictions (
+                        user_id, image_name, image_url, prediction, confidence, severity, summary, suggestion, grad_cam_data
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id, created_at;
+                """, (
+                    user_id, file.filename, thumbnail_url, label, confidence, severity, summary, suggestion, coords_json
+                ))
+                record_id, created_at = cur.fetchone()
             
             result = {
-                "id": record.id,
+                "id": record_id,
                 "prediction": label,
                 "confidence": confidence,
                 "severity": severity,
@@ -203,7 +286,7 @@ def predict():
                 "suggestion": suggestion,
                 "image_url": thumbnail_url,
                 "grad_cam_coordinates": heatmap.tolist(),
-                "timestamp": record.created_at.isoformat() + "Z",
+                "timestamp": created_at.isoformat() + "Z",
                 "inference_ms": int((time.time() - start_time) * 1000)
             }
             
@@ -216,42 +299,57 @@ def predict():
 @jwt_required()
 def history():
     user_id = int(get_jwt_identity())
-    current_user = User.query.get(user_id)
     
-    # Admin facility: if admin, allow viewing all records with full clinician audit details
-    if current_user and getattr(current_user, 'role', 'user') == 'admin':
-        records = PredictionRecord.query.order_by(PredictionRecord.created_at.desc()).all()
-    else:
-        records = PredictionRecord.query.filter_by(user_id=user_id).order_by(PredictionRecord.created_at.desc()).all()
-    
-    results = []
-    for r in records:
-        uploader = User.query.get(r.user_id) if r.user_id else None
+    with get_db_cursor() as cur:
+        # Check caller role
+        cur.execute("SELECT role FROM users WHERE id = %s;", (user_id,))
+        caller = cur.fetchone()
+        is_admin = caller and caller[0] == 'admin'
+
+        if is_admin:
+            cur.execute("""
+                SELECT p.id, p.image_name, p.image_url, p.prediction, p.confidence, p.severity,
+                       p.summary, p.suggestion, p.grad_cam_data, p.created_at, u.username, u.role
+                FROM predictions p
+                LEFT JOIN users u ON p.user_id = u.id
+                ORDER BY p.created_at DESC;
+            """)
+        else:
+            cur.execute("""
+                SELECT p.id, p.image_name, p.image_url, p.prediction, p.confidence, p.severity,
+                       p.summary, p.suggestion, p.grad_cam_data, p.created_at, u.username, u.role
+                FROM predictions p
+                LEFT JOIN users u ON p.user_id = u.id
+                WHERE p.user_id = %s
+                ORDER BY p.created_at DESC;
+            """, (user_id,))
         
-        # Parse coordinates if available
-        coords = None
-        if getattr(r, 'grad_cam_data', None):
-            try:
-                coords = json.loads(r.grad_cam_data)
-            except Exception:
-                coords = None
-                
-        results.append({
-            "id": r.id,
-            "image_name": getattr(r, 'image_name', None) or 'X-Ray Scan',
-            "image_url": getattr(r, 'image_url', None),
-            "uploader": uploader.username if uploader else "Anonymous",
-            "uploader_role": getattr(uploader, 'role', 'user') if uploader else 'user',
-            "prediction": r.prediction,
-            "confidence": r.confidence,
-            "severity": r.severity,
-            "summary": getattr(r, 'summary', None) or "Radiograph analysis completed.",
-            "suggestion": getattr(r, 'suggestion', None) or "Clinical correlation recommended.",
-            "grad_cam_coordinates": coords,
-            "timestamp": r.created_at.isoformat() + "Z"
-        })
-        
-    return jsonify(results), 200
+        rows = cur.fetchall()
+        results = []
+        for r in rows:
+            coords = None
+            if r[8]:
+                try:
+                    coords = json.loads(r[8])
+                except Exception:
+                    coords = None
+
+            results.append({
+                "id": r[0],
+                "image_name": r[1] or 'X-Ray Scan',
+                "image_url": r[2],
+                "prediction": r[3],
+                "confidence": r[4],
+                "severity": r[5],
+                "summary": r[6] or "Radiograph analysis completed.",
+                "suggestion": r[7] or "Clinical correlation recommended.",
+                "grad_cam_coordinates": coords,
+                "timestamp": r[9].isoformat() + "Z" if r[9] else None,
+                "uploader": r[10] or "Anonymous",
+                "uploader_role": r[11] or "user"
+            })
+            
+        return jsonify(results), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=False)
