@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "start": "./start.sh",
     "dev": "npm --prefix frontend run dev",
     "install": "npm --prefix frontend install"
   }

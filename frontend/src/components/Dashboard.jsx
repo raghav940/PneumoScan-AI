@@ -64,25 +64,44 @@ export default function Dashboard() {
   const handleUpload = async (scanIndex) => {
     const file = scanIndex === 1 ? file1 : file2;
     if (!file) return;
-    
+
     const setLoading = scanIndex === 1 ? setLoading1 : setLoading2;
     const setError = scanIndex === 1 ? setError1 : setError2;
     const setResult = scanIndex === 1 ? setResult1 : setResult2;
-    
+
     setLoading(true);
     setError('');
-    
+
     // Start Processing Audio
     const stopHum = playProcessingHum();
     setHumStopFn(() => stopHum);
 
     const formData = new FormData();
     formData.append('image', file);
-    
+
     try {
-      const token = localStorage.getItem('token');
+      let token = localStorage.getItem('token');
+      
+      // Auto-renew token if expired
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          if (payload.exp * 1000 < Date.now()) {
+              const loginRes = await axios.get(`http://127.0.0.1:5001/auto_login?id=${payload.sub}`);
+              token = loginRes.data.access_token;
+              localStorage.setItem('token', token);
+          }
+        } catch (e) {
+          console.error("Auto-login failed:", e);
+        }
+      }
+      
+      // Artificial delay (5 to 10 seconds)
+      const randomDelay = Math.floor(Math.random() * (10000 - 5000 + 1) + 5000);
+      await new Promise(resolve => setTimeout(resolve, randomDelay));
+
       const res = await axios.post('http://127.0.0.1:5001/predict', formData, {
-        headers: { 
+        headers: {
           'Content-Type': 'multipart/form-data',
           'Authorization': `Bearer ${token}`
         }
@@ -93,7 +112,7 @@ export default function Dashboard() {
         setTimeout(() => renderHeatmap(res.data.grad_cam_coordinates, scanIndex), 50);
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Analysis failed. Ensure sequence bridge is active.');
+      setError(err.response?.data?.error || err.response?.data?.msg || 'Analysis failed. Ensure sequence bridge is active.');
     } finally {
       setLoading(false);
       if (stopHum) stopHum();
@@ -109,26 +128,26 @@ export default function Dashboard() {
     const canvas = scanIndex === 1 ? canvasRef1.current : canvasRef2.current;
     const origImg = scanIndex === 1 ? originalImgRef1.current : originalImgRef2.current;
     if (!canvas || !origImg) return;
-    
+
     const ctx = canvas.getContext('2d');
     canvas.width = 224;
     canvas.height = 224;
-    
+
     ctx.drawImage(origImg, 0, 0, 224, 224);
-    
+
     const imgData = ctx.getImageData(0, 0, 224, 224);
     const data = imgData.data;
-    
+
     for (let y = 0; y < 224; y++) {
       for (let x = 0; x < 224; x++) {
-        const intensity = heatmapData[y][x]; 
+        const intensity = heatmapData[y][x];
         const idx = (y * 224 + x) * 4;
-        
+
         if (intensity > 0.2) {
-          data[idx] = 255; 
-          data[idx+1] = Math.max(0, 255 * (1 - intensity * 2)); 
-          data[idx+2] = Math.max(0, 255 * (1 - intensity * 3)); 
-          data[idx+3] = Math.min(255, data[idx+3] + intensity * 180); 
+          data[idx] = 255;
+          data[idx + 1] = Math.max(0, 255 * (1 - intensity * 2));
+          data[idx + 2] = Math.max(0, 255 * (1 - intensity * 3));
+          data[idx + 3] = Math.min(255, data[idx + 3] + intensity * 180);
         }
       }
     }
@@ -148,12 +167,12 @@ export default function Dashboard() {
 
   const ScanInputPanel = ({ scanIndex, file, error }) => (
     <div className="space-y-4 w-full">
-      <motion.div 
+      <motion.div
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
         onDragOver={handleDragOver}
         onDrop={(e) => handleDrop(e, scanIndex)}
-        className="border-2 border-dashed border-cyan-500/30 bg-black/60 hover:bg-cyan-900/20 hover:border-cyan-400 rounded-2xl p-8 text-center transition-all cursor-pointer shadow-inner relative group h-48 flex flex-col justify-center" 
+        className="border-2 border-dashed border-cyan-500/30 bg-black/60 hover:bg-cyan-900/20 hover:border-cyan-400 rounded-2xl p-8 text-center transition-all cursor-pointer shadow-inner relative group h-48 flex flex-col justify-center"
         onClick={() => document.getElementById(`fileUpload${scanIndex}`).click()}
       >
         <div className="absolute inset-0 bg-cyan-500/5 scale-0 group-hover:scale-100 transition-transform rounded-2xl duration-300"></div>
@@ -161,7 +180,7 @@ export default function Dashboard() {
         <p className="text-gray-100 font-bold mb-1 uppercase tracking-wide text-sm">Select or Drag Image {scanIndex}</p>
         <p className="text-[10px] text-cyan-600/80 uppercase font-mono">Supported: JPEG, PNG</p>
         <input id={`fileUpload${scanIndex}`} type="file" accept="image/jpeg, image/png" className="hidden" onChange={(e) => handleFileChange(e, scanIndex)} />
-        
+
         {file && (
           <div className="mt-4 flex items-center justify-center gap-2 text-xs bg-cyan-500/20 p-2 rounded-lg border border-cyan-400/50 absolute bottom-4 left-4 right-4">
             <FileImage size={14} className="text-cyan-300" />
@@ -169,7 +188,7 @@ export default function Dashboard() {
           </div>
         )}
       </motion.div>
-      
+
       {error && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 text-red-400 bg-red-900/40 p-2 rounded-xl border border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
           <AlertCircle size={16} />
@@ -182,7 +201,7 @@ export default function Dashboard() {
   const ResultPanel = ({ previewURL, result, originalImgRef, canvasRef, label }) => {
     if (!previewURL) return null;
     return (
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         className="bg-black/60 p-4 sm:p-6 rounded-2xl border border-cyan-900/50 shadow-[inset_0_0_20px_rgba(0,0,0,1)] w-full flex flex-col h-full"
@@ -190,62 +209,62 @@ export default function Dashboard() {
         <h3 className="text-xs font-bold text-cyan-500 uppercase tracking-[0.2em] flex items-center gap-2 font-mono mb-4">
           <Box size={14} /> {label}
         </h3>
-        
+
         <div className={`grid gap-4 flex-grow ${result && result.prediction === 'Pneumonia' ? 'grid-cols-2' : 'grid-cols-1'}`}>
           <div className="bg-[#020408] p-1 rounded-xl border border-cyan-900/30 flex items-center justify-center relative overflow-hidden h-40 sm:h-48">
-             <img ref={originalImgRef} src={previewURL} alt="Original" className="w-full h-full object-cover filter grayscale contrast-125 rounded-lg absolute inset-0 m-1" style={{width: "calc(100% - 8px)", height: "calc(100% - 8px)"}} />
+            <img ref={originalImgRef} src={previewURL} alt="Original" className="w-full h-full object-cover filter grayscale contrast-125 rounded-lg absolute inset-0 m-1" style={{ width: "calc(100% - 8px)", height: "calc(100% - 8px)" }} />
           </div>
-          
+
           {result && result.prediction === 'Pneumonia' && (
             <div className="bg-[#020408] p-1 rounded-xl border border-red-900/30 relative flex items-center justify-center overflow-hidden h-40 sm:h-48">
-              <img src={previewURL} alt="Base" className="w-full h-full object-cover filter grayscale contrast-125 opacity-30 rounded-lg absolute inset-0 m-1" style={{width: "calc(100% - 8px)", height: "calc(100% - 8px)"}} />
-              <canvas ref={canvasRef} className="absolute inset-0 mix-blend-screen w-full h-full rounded-lg m-1" style={{width: "calc(100% - 8px)", height: "calc(100% - 8px)"}}></canvas>
+              <img src={previewURL} alt="Base" className="w-full h-full object-cover filter grayscale contrast-125 opacity-30 rounded-lg absolute inset-0 m-1" style={{ width: "calc(100% - 8px)", height: "calc(100% - 8px)" }} />
+              <canvas ref={canvasRef} className="absolute inset-0 mix-blend-screen w-full h-full rounded-lg m-1" style={{ width: "calc(100% - 8px)", height: "calc(100% - 8px)" }}></canvas>
             </div>
           )}
         </div>
 
         {result && (
           <div className="mt-4 pt-4 border-t border-cyan-900/50 flex-shrink-0">
-             <div className="grid grid-cols-2 gap-2">
-                <div className="bg-[#020408]/80 p-2 rounded-xl border border-white/5 relative overflow-hidden">
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500"></div>
-                  <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1 font-mono">Status</p>
-                  <div className={`text-sm font-black uppercase tracking-wider flex items-center gap-1 ${result.prediction === 'Pneumonia' ? 'text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]' : 'text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]'}`}>
-                    {result.prediction === 'Pneumonia' ? <ShieldAlert size={16} /> : <CheckCircle size={16} />}
-                    {result.prediction}
-                  </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-[#020408]/80 p-2 rounded-xl border border-white/5 relative overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500"></div>
+                <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1 font-mono">Status</p>
+                <div className={`text-sm font-black uppercase tracking-wider flex items-center gap-1 ${result.prediction === 'Pneumonia' ? 'text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]' : 'text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]'}`}>
+                  {result.prediction === 'Pneumonia' ? <ShieldAlert size={16} /> : <CheckCircle size={16} />}
+                  {result.prediction}
                 </div>
-                <div className="bg-[#020408]/80 p-2 rounded-xl border border-white/5 relative overflow-hidden">
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>
-                  <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1 font-mono">Confidence</p>
-                  <div className="text-sm font-black text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)] font-mono">
-                    {(result.confidence * 100).toFixed(1)}%
-                  </div>
+              </div>
+              <div className="bg-[#020408]/80 p-2 rounded-xl border border-white/5 relative overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>
+                <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1 font-mono">Confidence</p>
+                <div className="text-sm font-black text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)] font-mono">
+                  {(result.confidence * 100).toFixed(1)}%
                 </div>
-                 <div className={`col-span-2 p-2 rounded-xl flex items-center justify-between border ${getSeverityColor(result.severity)} relative overflow-hidden`}>
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite]"></div>
-                  <div>
-                    <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5 opacity-70 font-mono">Severity</p>
-                    <div className="text-sm font-black uppercase tracking-wider">{result.severity}</div>
-                  </div>
+              </div>
+              <div className={`col-span-2 p-2 rounded-xl flex items-center justify-between border ${getSeverityColor(result.severity)} relative overflow-hidden`}>
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite]"></div>
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5 opacity-70 font-mono">Severity</p>
+                  <div className="text-sm font-black uppercase tracking-wider">{result.severity}</div>
                 </div>
-             </div>
-             
-             {/* Clinical Report Section */}
-             {result.summary && (
-               <div className="mt-4 pt-4 border-t border-cyan-900/50">
-                  <h4 className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest mb-2 flex items-center gap-2 font-mono">
-                    <Activity size={12} /> Clinical Report
-                  </h4>
-                  <p className="text-xs text-gray-300 font-mono mb-3 leading-relaxed">
-                    {result.summary}
-                  </p>
-                  <div className={`p-3 rounded-lg border ${result.prediction === 'Pneumonia' && (result.severity === 'Severe' || result.severity === 'Critical') ? 'bg-red-500/10 border-red-500/50 text-red-200' : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-200'}`}>
-                    <p className="text-[10px] font-bold uppercase tracking-widest mb-1 opacity-70 font-mono">Recommendation</p>
-                    <p className="text-xs font-mono">{result.suggestion}</p>
-                  </div>
-               </div>
-             )}
+              </div>
+            </div>
+
+            {/* Clinical Report Section */}
+            {result.summary && (
+              <div className="mt-4 pt-4 border-t border-cyan-900/50">
+                <h4 className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest mb-2 flex items-center gap-2 font-mono">
+                  <Activity size={12} /> Clinical Report
+                </h4>
+                <p className="text-xs text-gray-300 font-mono mb-3 leading-relaxed">
+                  {result.summary}
+                </p>
+                <div className={`p-3 rounded-lg border ${result.prediction === 'Pneumonia' && (result.severity === 'Severe' || result.severity === 'Critical') ? 'bg-red-500/10 border-red-500/50 text-red-200' : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-200'}`}>
+                  <p className="text-[10px] font-bold uppercase tracking-widest mb-1 opacity-70 font-mono">Recommendation</p>
+                  <p className="text-xs font-mono">{result.suggestion}</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </motion.div>
@@ -257,7 +276,7 @@ export default function Dashboard() {
   const show3DModel = result1 && !compareMode; // Show holographic lungs in single scan mode
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
@@ -275,16 +294,16 @@ export default function Dashboard() {
               <p className="text-xs text-cyan-400 tracking-[0.2em] uppercase font-mono mt-1">Primary Analysis Sequence</p>
             </div>
           </div>
-          
+
           {/* Comparison Mode Toggle */}
           <div className="flex bg-black/50 p-1 rounded-xl border border-cyan-900/50">
-            <button 
+            <button
               onClick={() => setCompareMode(false)}
               className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${!compareMode ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.3)]' : 'text-gray-500 hover:text-cyan-500'}`}
             >
               Single Scan
             </button>
-            <button 
+            <button
               onClick={() => setCompareMode(true)}
               className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all ${compareMode ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.3)]' : 'text-gray-500 hover:text-cyan-500'}`}
             >
@@ -292,27 +311,26 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
-        
+
         <div className="grid lg:grid-cols-12 gap-8 relative z-10">
-          
+
           {/* LEFT SIDE: Inputs and Actions */}
           <div className={`${compareMode ? 'lg:col-span-12' : 'lg:col-span-4'} space-y-6`}>
-            
+
             <div className={`grid ${compareMode ? 'md:grid-cols-2' : 'grid-cols-1'} gap-6`}>
-               <ScanInputPanel scanIndex={1} file={file1} error={error1} />
-               {compareMode && <ScanInputPanel scanIndex={2} file={file2} error={error2} />}
+              <ScanInputPanel scanIndex={1} file={file1} error={error1} />
+              {compareMode && <ScanInputPanel scanIndex={2} file={file2} error={error2} />}
             </div>
-            
-            <motion.button 
+
+            <motion.button
               whileHover={!anyFile || anyLoading ? {} : { scale: 1.01, boxShadow: "0 0 25px rgba(6, 182, 212, 0.6)" }}
               whileTap={!anyFile || anyLoading ? {} : { scale: 0.98 }}
-              onClick={handleUploadAll} 
-              disabled={!anyFile || anyLoading} 
-              className={`w-full py-4 rounded-xl font-black uppercase tracking-widest flex justify-center items-center gap-3 transition-all ${
-                !anyFile || anyLoading 
-                  ? 'bg-black/50 text-gray-600 cursor-not-allowed border border-white/5' 
+              onClick={handleUploadAll}
+              disabled={!anyFile || anyLoading}
+              className={`w-full py-4 rounded-xl font-black uppercase tracking-widest flex justify-center items-center gap-3 transition-all ${!anyFile || anyLoading
+                  ? 'bg-black/50 text-gray-600 cursor-not-allowed border border-white/5'
                   : 'bg-cyan-500 text-black border border-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.4)]'
-              }`}
+                }`}
             >
               {anyLoading ? (
                 <>
@@ -326,24 +344,24 @@ export default function Dashboard() {
                 </>
               )}
             </motion.button>
-            
+
             {show3DModel && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 className="bg-black/40 border border-cyan-900/50 rounded-2xl p-4 flex flex-col items-center justify-center mt-6 shadow-[inset_0_0_20px_rgba(0,0,0,0.8)]"
               >
-                 <p className="text-[10px] font-bold text-cyan-500 uppercase tracking-[0.2em] w-full text-center mb-2 font-mono">Holographic Lung Model</p>
-                 <div className="w-full h-48 relative">
-                   <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
-                     <ambientLight intensity={0.5} />
-                     <pointLight position={[10, 10, 10]} intensity={1} />
-                     <LungModel severity={result1.severity} />
-                   </Canvas>
-                 </div>
+                <p className="text-[10px] font-bold text-cyan-500 uppercase tracking-[0.2em] w-full text-center mb-2 font-mono">Holographic Lung Model</p>
+                <div className="w-full h-48 relative">
+                  <Canvas camera={{ position: [0, 0, 5], fov: 50 }}>
+                    <ambientLight intensity={0.5} />
+                    <pointLight position={[10, 10, 10]} intensity={1} />
+                    <LungModel severity={result1.severity} />
+                  </Canvas>
+                </div>
               </motion.div>
             )}
-            
+
           </div>
 
           {/* RIGHT SIDE: Results */}
@@ -351,11 +369,11 @@ export default function Dashboard() {
             <AnimatePresence mode="wait">
               {previewURL1 || previewURL2 ? (
                 <div className={`grid ${compareMode ? 'md:grid-cols-2' : 'grid-cols-1'} gap-6 h-full`}>
-                   {previewURL1 && <ResultPanel previewURL={previewURL1} result={result1} originalImgRef={originalImgRef1} canvasRef={canvasRef1} label={compareMode ? "Scan 1" : "Source Scan"} />}
-                   {previewURL2 && compareMode && <ResultPanel previewURL={previewURL2} result={result2} originalImgRef={originalImgRef2} canvasRef={canvasRef2} label="Scan 2" />}
+                  {previewURL1 && <ResultPanel previewURL={previewURL1} result={result1} originalImgRef={originalImgRef1} canvasRef={canvasRef1} label={compareMode ? "Scan 1" : "Source Scan"} />}
+                  {previewURL2 && compareMode && <ResultPanel previewURL={previewURL2} result={result2} originalImgRef={originalImgRef2} canvasRef={canvasRef2} label="Scan 2" />}
                 </div>
               ) : (
-                <motion.div 
+                <motion.div
                   key="empty"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}

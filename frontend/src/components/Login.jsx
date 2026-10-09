@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LogIn, User, Lock, Cpu } from 'lucide-react';
+import { User, Lock, Cpu } from 'lucide-react';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -18,7 +18,7 @@ export default function Login() {
       const res = await axios.post('http://127.0.0.1:5001/login', { username, password });
       localStorage.setItem('token', res.data.access_token);
       localStorage.setItem('username', res.data.username);
-      navigate('/dashboard');
+      navigate('/scan');
     } catch (err) {
       setError(err.response?.data?.error || 'Authentication sequence failed');
     } finally {

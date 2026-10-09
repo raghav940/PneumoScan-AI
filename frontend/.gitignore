@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Data folders
+ml_service/dataset/
+ml_service/uploads/

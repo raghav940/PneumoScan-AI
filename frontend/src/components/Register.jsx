@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { UserPlus, User, Lock, Network } from 'lucide-react';
+import { User, Lock, Network } from 'lucide-react';
 
 export default function Register() {
   const [username, setUsername] = useState('');

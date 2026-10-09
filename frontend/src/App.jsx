@@ -27,7 +27,7 @@ function App() {
               <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
-                <Route path="/dashboard" element={
+                <Route path="/scan" element={
                   <PrivateRoute>
                     <Dashboard />
                   </PrivateRoute>
@@ -37,7 +37,7 @@ function App() {
                     <History />
                   </PrivateRoute>
                 } />
-                <Route path="/" element={<Navigate to="/dashboard" />} />
+                <Route path="/" element={<Navigate to="/scan" />} />
               </Routes>
             </AnimatePresence>
           </main>
