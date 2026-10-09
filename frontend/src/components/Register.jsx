@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { User, Lock, Network } from 'lucide-react';
+import { User, Lock, Network, Eye, EyeOff } from 'lucide-react';
 
 import API_BASE from '../utils/api';
 
 export default function Register() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -77,13 +78,25 @@ export default function Register() {
                   <Lock className="text-cyan-600 h-5 w-5" />
                 </div>
                 <input 
-                  type="password" 
+                  type={showPassword ? 'text' : 'password'} 
                   value={password} 
                   onChange={e=>setPassword(e.target.value)} 
                   required 
                   placeholder="Password"
-                  className="w-full pl-10 pr-3 py-3 bg-black/60 border border-cyan-900/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all shadow-inner" 
+                  className="w-full pl-10 pr-10 py-3 bg-black/60 border border-cyan-900/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all shadow-inner" 
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-cyan-400 transition-colors focus:outline-none"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
               </div>
             </div>
             <motion.button 
