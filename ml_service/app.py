@@ -265,54 +265,58 @@ def predict():
             label_idx = predicted.item()
             confidence = float(confidence.item())
             label = "Pneumonia" if label_idx == 1 else "Normal"
-            
-            # Layer-4 Grad-CAM Activation Map
-            heatmap = grad_cam.generate(tensor, target_class=label_idx)
-            severity = determine_severity(confidence, heatmap.max()) if label == "Pneumonia" else "Normal"
-            
-            # Generate lightweight compressed thumbnail
-            thumbnail_url = generate_compressed_thumbnail(image_bytes)
-            
-            # Clinical Summary and Suggestion Logic
-            if severity == "Normal":
-                summary = "No abnormal opacities or consolidations detected in the lung fields. Clear cardiophrenic and costophrenic angles."
-                suggestion = "Radiograph is consistent with clear respiratory fields. Routine preventative screening recommended."
-            elif severity in ["Mild", "Moderate"]:
-                summary = "Patchy opacities detected, primarily indicative of early-stage or mild pneumonic infiltration."
-                suggestion = "Recommend clinical correlation and potential outpatient antibiotic therapy. Follow-up imaging in 7-14 days."
-            else: # Severe or Critical
-                summary = "Extensive dense consolidations obscuring significant portions of the lung fields, indicative of severe bilateral or lobar pneumonia."
-                suggestion = "URGENT: Recommend immediate hospitalization and aggressive medical intervention. Oxygen therapy and broad-spectrum IV antibiotics may be required."
 
-            coords_json = json.dumps(heatmap.tolist())
+        # Layer-4 Grad-CAM Activation Map (requires gradient tracking for target layer)
+        with torch.enable_grad():
+            heatmap = grad_cam.generate(tensor.clone(), target_class=label_idx)
 
-            # Save full report directly using psycopg2
-            with get_db_cursor(commit=True) as cur:
-                cur.execute("""
-                    INSERT INTO predictions (
-                        user_id, image_name, image_url, prediction, confidence, severity, summary, suggestion, grad_cam_data
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING id, created_at;
-                """, (
-                    user_id, file.filename, thumbnail_url, label, confidence, severity, summary, suggestion, coords_json
-                ))
-                record_id, created_at = cur.fetchone()
+        severity = determine_severity(confidence, float(heatmap.max())) if label == "Pneumonia" else "Normal"
+        
+        # Generate lightweight compressed thumbnail
+        thumbnail_url = generate_compressed_thumbnail(image_bytes)
             
-            result = {
-                "id": record_id,
-                "prediction": label,
-                "confidence": confidence,
-                "severity": severity,
-                "summary": summary,
-                "suggestion": suggestion,
-                "image_url": thumbnail_url,
-                "grad_cam_coordinates": heatmap.tolist(),
-                "timestamp": created_at.isoformat() + "Z",
-                "inference_ms": int((time.time() - start_time) * 1000)
-            }
-            
-            return jsonify(result), 200
-            
+        # Clinical Summary and Suggestion Logic
+        if severity == "Normal":
+            summary = "No abnormal opacities or consolidations detected in the lung fields. Clear cardiophrenic and costophrenic angles."
+            suggestion = "Radiograph is consistent with clear respiratory fields. Routine preventative screening recommended."
+        elif severity in ["Mild", "Moderate"]:
+            summary = "Patchy opacities detected, primarily indicative of early-stage or mild pneumonic infiltration."
+            suggestion = "Recommend clinical correlation and potential outpatient antibiotic therapy. Follow-up imaging in 7-14 days."
+        else: # Severe or Critical
+            summary = "Extensive dense consolidations obscuring significant portions of the lung fields, indicative of severe bilateral or lobar pneumonia."
+            suggestion = "URGENT: Recommend immediate hospitalization and aggressive medical intervention. Oxygen therapy and broad-spectrum IV antibiotics may be required."
+
+        coords_json = json.dumps(heatmap.tolist())
+
+        # Save full report directly using psycopg2
+        with get_db_cursor(commit=True) as cur:
+            cur.execute("""
+                INSERT INTO predictions (
+                    user_id, image_name, image_url, prediction, confidence, severity, summary, suggestion, grad_cam_data
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id, created_at;
+            """, (
+                user_id, file.filename, thumbnail_url, label, confidence, severity, summary, suggestion, coords_json
+            ))
+            record_id, created_at = cur.fetchone()
+        
+        ts_str = (created_at or datetime.utcnow()).isoformat() + "Z"
+
+        result = {
+            "id": record_id,
+            "prediction": label,
+            "confidence": confidence,
+            "severity": severity,
+            "summary": summary,
+            "suggestion": suggestion,
+            "image_url": thumbnail_url,
+            "grad_cam_coordinates": heatmap.tolist(),
+            "timestamp": ts_str,
+            "inference_ms": int((time.time() - start_time) * 1000)
+        }
+        
+        return jsonify(result), 200
+        
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

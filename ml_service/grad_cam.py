@@ -20,6 +20,9 @@ class GradCAM:
     def save_gradient(self, module, grad_input, grad_output):
         self.gradients = grad_output[0]
         
+    def generate(self, input_tensor, target_class):
+        return self.generate_heatmap(input_tensor, target_class)
+
     def generate_heatmap(self, input_tensor, target_class):
         self.model.eval()
         
