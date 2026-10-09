@@ -38,6 +38,10 @@ with app.app_context():
     except Exception:
         pass
 
+# Limit PyTorch CPU threads to 1 to reduce memory overhead on micro instances
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
+
 # --- ML Model Initialization ---
 model_path = 'pneumoscan.pt'
 model = CNNModel()

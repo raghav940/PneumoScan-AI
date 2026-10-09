@@ -24,4 +24,5 @@ COPY . .
 ENV PORT=7860
 EXPOSE 7860
 
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-7860} --workers 2 --timeout 120 app:app"]
+# Run 1 worker with 2 lightweight threads to comfortably stay below 512MB RAM
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-7860} --workers 1 --threads 2 --timeout 120 app:app"]
