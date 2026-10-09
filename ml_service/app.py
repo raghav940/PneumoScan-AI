@@ -293,6 +293,9 @@ def predict():
         coords_json = json.dumps(heatmap.tolist())
 
         # Save full report directly using psycopg2
+        # Use overlay_url if available so history viewer can render directly without client-side canvas
+        stored_image_url = overlay_url or thumbnail_url
+
         with get_db_cursor(commit=True) as cur:
             cur.execute("""
                 INSERT INTO predictions (
@@ -300,7 +303,7 @@ def predict():
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id, created_at;
             """, (
-                user_id, file.filename, thumbnail_url, label, confidence, severity, summary, suggestion, coords_json
+                user_id, file.filename, stored_image_url, label, confidence, severity, summary, suggestion, coords_json
             ))
             record_id, created_at = cur.fetchone()
         

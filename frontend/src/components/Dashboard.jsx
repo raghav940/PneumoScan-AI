@@ -91,9 +91,6 @@ export default function Dashboard() {
       });
       setResult(res.data);
       playSuccessPing(); // Play success sound
-      if (res.data.prediction === 'Pneumonia' && res.data.grad_cam_coordinates) {
-        setTimeout(() => renderHeatmap(res.data.grad_cam_coordinates, scanIndex), 50);
-      }
     } catch (err) {
       setError(err.response?.data?.error || 'Analysis failed. Ensure sequence bridge is active.');
     } finally {
@@ -105,73 +102,6 @@ export default function Dashboard() {
   const handleUploadAll = async () => {
     if (file1 && !result1) handleUpload(1);
     if (file2 && !result2 && compareMode) handleUpload(2);
-  };
-
-  const renderHeatmap = (heatmapData, scanIndex) => {
-    const canvas = scanIndex === 1 ? canvasRef1.current : canvasRef2.current;
-    const origImg = scanIndex === 1 ? originalImgRef1.current : originalImgRef2.current;
-    if (!canvas || !heatmapData) return;
-
-    const draw = () => {
-      const ctx = canvas.getContext('2d');
-      canvas.width = 224;
-      canvas.height = 224;
-
-      if (origImg && origImg.complete && origImg.naturalWidth > 0) {
-        ctx.drawImage(origImg, 0, 0, 224, 224);
-      } else {
-        ctx.fillStyle = '#111827';
-        ctx.fillRect(0, 0, 224, 224);
-      }
-
-      const imgData = ctx.getImageData(0, 0, 224, 224);
-      const data = imgData.data;
-
-      // Vivid Medical Jet / Thermal Colormap
-      for (let y = 0; y < 224; y++) {
-        for (let x = 0; x < 224; x++) {
-          const val = heatmapData[y] ? heatmapData[y][x] : 0;
-          if (val > 0.15) {
-            const idx = (y * 224 + x) * 4;
-            // Normalized intensity between 0 and 1
-            const norm = Math.min(1, Math.max(0, (val - 0.15) / 0.85));
-
-            // Thermal gradient: Blue (low) -> Cyan -> Yellow -> Red (peak consolidation)
-            let r = 0, g = 0, b = 0;
-            if (norm < 0.25) {
-              r = 0;
-              g = Math.floor(255 * (norm / 0.25));
-              b = 255;
-            } else if (norm < 0.5) {
-              r = 0;
-              g = 255;
-              b = Math.floor(255 * (1 - (norm - 0.25) / 0.25));
-            } else if (norm < 0.75) {
-              r = Math.floor(255 * ((norm - 0.5) / 0.25));
-              g = 255;
-              b = 0;
-            } else {
-              r = 255;
-              g = Math.floor(255 * (1 - (norm - 0.75) / 0.25));
-              b = 0;
-            }
-
-            // Alpha blending with base radiograph
-            const alpha = 0.55 + norm * 0.4;
-            data[idx] = Math.floor(data[idx] * (1 - alpha) + r * alpha);
-            data[idx + 1] = Math.floor(data[idx + 1] * (1 - alpha) + g * alpha);
-            data[idx + 2] = Math.floor(data[idx + 2] * (1 - alpha) + b * alpha);
-            data[idx + 3] = 255;
-          }
-        }
-      }
-      ctx.putImageData(imgData, 0, 0);
-    };
-
-    // Draw after DOM paint cycle
-    requestAnimationFrame(draw);
-    setTimeout(draw, 100);
-    setTimeout(draw, 300);
   };
 
   const getSeverityColor = (severity) => {
@@ -217,74 +147,6 @@ export default function Dashboard() {
       )}
     </div>
   );
-
-  const ResultPanel = ({ previewURL, result, originalImgRef, canvasRef, label }) => {
-    if (!previewURL) return null;
-    return (
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-black/60 p-4 sm:p-6 rounded-2xl border border-cyan-900/50 shadow-[inset_0_0_20px_rgba(0,0,0,1)] w-full flex flex-col h-full"
-      >
-        <h3 className="text-xs font-bold text-cyan-500 uppercase tracking-[0.2em] flex items-center gap-2 font-mono mb-4">
-          <Box size={14} /> {label}
-        </h3>
-        
-        <div className={`grid gap-4 flex-grow ${result && result.prediction === 'Pneumonia' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
-          <div className="bg-[#020408] p-2 rounded-xl border border-cyan-900/30 flex flex-col items-center justify-center relative overflow-hidden min-h-[260px] sm:min-h-[300px]">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-cyan-400/80 mb-1 z-10 self-start px-2 py-0.5 rounded bg-black/60 border border-cyan-900/50">Raw X-Ray Image</span>
-            <div className="w-full h-full flex-grow relative flex items-center justify-center">
-              <img ref={originalImgRef} src={previewURL} alt="Original Radiograph" className="max-w-full max-h-[260px] object-contain rounded-lg shadow-md" />
-            </div>
-          </div>
-          
-          {result && result.prediction === 'Pneumonia' && (
-            <div className="bg-[#020408] p-2 rounded-xl border border-red-900/40 flex flex-col items-center justify-center relative overflow-hidden min-h-[260px] sm:min-h-[300px]">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-red-400 mb-1 z-10 self-start px-2 py-0.5 rounded bg-red-950/60 border border-red-800/50 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                Infection Zone (Grad-CAM)
-              </span>
-              <div className="w-full h-full flex-grow relative flex items-center justify-center">
-                {result.heatmap_url ? (
-                  <img 
-                    src={result.heatmap_url} 
-                    alt="Grad-CAM Infection Map" 
-                    className="max-w-full max-h-[260px] object-contain rounded-lg shadow-lg border border-red-500/20" 
-                  />
-                ) : (
-                  <canvas ref={canvasRef} className="max-w-full max-h-[260px] object-contain rounded-lg shadow-lg border border-red-500/20"></canvas>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {result && (
-          <div className="mt-4 pt-4 border-t border-cyan-900/50 flex-shrink-0 space-y-4">
-             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#020408]/80 p-3 rounded-xl border border-white/5">
-               <DiagnosisBadge prediction={result.prediction} confidence={result.confidence} severity={result.severity} />
-             </div>
-             
-             {/* Clinical Report Section */}
-             {result.summary && (
-               <div>
-                  <h4 className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider mb-2 flex items-center gap-2 font-mono">
-                    <Activity size={13} /> Clinical Summary
-                  </h4>
-                  <p className="text-xs text-gray-300 font-sans mb-3 leading-relaxed">
-                    {result.summary}
-                  </p>
-                  <div className={`p-3 rounded-lg border ${result.prediction === 'Pneumonia' && (result.severity === 'Severe' || result.severity === 'Critical') ? 'bg-red-500/10 border-red-500/50 text-red-200' : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-200'}`}>
-                    <p className="text-[10px] font-bold uppercase tracking-wider mb-1 opacity-80 font-mono">Recommendation</p>
-                    <p className="text-xs font-sans">{result.suggestion}</p>
-                  </div>
-               </div>
-             )}
-          </div>
-        )}
-      </motion.div>
-    );
-  };
 
   const anyLoading = loading1 || loading2;
   const anyFile = file1 || (compareMode && file2);
@@ -389,31 +251,114 @@ export default function Dashboard() {
 
           {/* RIGHT SIDE: Results */}
           <div className={`${compareMode ? 'lg:col-span-12' : 'lg:col-span-8'}`}>
-            <AnimatePresence mode="wait">
-              {previewURL1 || previewURL2 ? (
-                <div className={`grid ${compareMode ? 'md:grid-cols-2' : 'grid-cols-1'} gap-6 h-full`}>
-                   {previewURL1 && <ResultPanel previewURL={previewURL1} result={result1} originalImgRef={originalImgRef1} canvasRef={canvasRef1} label={compareMode ? "Scan 1" : "Source Scan"} />}
-                   {previewURL2 && compareMode && <ResultPanel previewURL={previewURL2} result={result2} originalImgRef={originalImgRef2} canvasRef={canvasRef2} label="Scan 2" />}
+            {previewURL1 || previewURL2 ? (
+              <div className={`grid ${compareMode ? 'md:grid-cols-2' : 'grid-cols-1'} gap-6 h-full`}>
+                 {previewURL1 && (
+                   <ResultCard 
+                     key="panel-scan-1"
+                     previewURL={previewURL1} 
+                     result={result1} 
+                     label={compareMode ? "Scan 1" : "Source Scan"} 
+                   />
+                 )}
+                 {previewURL2 && compareMode && (
+                   <ResultCard 
+                     key="panel-scan-2"
+                     previewURL={previewURL2} 
+                     result={result2} 
+                     label="Scan 2" 
+                   />
+                 )}
+              </div>
+            ) : (
+              <motion.div 
+                key="empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="h-full min-h-[300px] flex flex-col items-center justify-center text-center p-12 border-2 border-dashed border-cyan-900/30 rounded-2xl bg-black/40"
+              >
+                <div className="relative mb-6">
+                  <div className="absolute inset-0 bg-cyan-500 blur-2xl opacity-20 rounded-full animate-pulse"></div>
+                  <Cpu className="text-cyan-800 relative z-10" size={80} />
                 </div>
-              ) : (
-                <motion.div 
-                  key="empty"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="h-full min-h-[300px] flex flex-col items-center justify-center text-center p-12 border-2 border-dashed border-cyan-900/30 rounded-2xl bg-black/40"
-                >
-                  <div className="relative mb-6">
-                    <div className="absolute inset-0 bg-cyan-500 blur-2xl opacity-20 rounded-full animate-pulse"></div>
-                    <Cpu className="text-cyan-800 relative z-10" size={80} />
-                  </div>
-                  <p className="text-xl font-black text-cyan-700 uppercase tracking-widest neon-text">System Standby</p>
-                  <p className="text-cyan-600/50 mt-2 max-w-sm text-sm font-mono">Awaiting imaging data input to initialize the diagnostic neural network.</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                <p className="text-xl font-black text-cyan-700 uppercase tracking-widest neon-text">System Standby</p>
+                <p className="text-cyan-600/50 mt-2 max-w-sm text-sm font-mono">Awaiting imaging data input to initialize the diagnostic neural network.</p>
+              </motion.div>
+            )}
           </div>
         </div>
       </div>
     </motion.div>
+  );
+}
+
+// Standalone ResultCard declared outside Dashboard to prevent component remounting
+function ResultCard({ previewURL, result, label }) {
+  if (!previewURL) return null;
+  return (
+    <div 
+      className="bg-black/60 p-4 sm:p-6 rounded-2xl border border-cyan-900/50 shadow-[inset_0_0_20px_rgba(0,0,0,1)] w-full flex flex-col h-full"
+    >
+      <h3 className="text-xs font-bold text-cyan-500 uppercase tracking-[0.2em] flex items-center gap-2 font-mono mb-4">
+        <Box size={14} /> {label}
+      </h3>
+      
+      <div className={`grid gap-4 flex-grow ${result && result.prediction === 'Pneumonia' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+        <div className="bg-[#020408] p-2 rounded-xl border border-cyan-900/30 flex flex-col items-center justify-center relative overflow-hidden min-h-[260px] sm:min-h-[300px]">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-cyan-400/80 mb-1 z-10 self-start px-2 py-0.5 rounded bg-black/60 border border-cyan-900/50">Raw X-Ray Image</span>
+          <div className="w-full h-full flex-grow relative flex items-center justify-center">
+            <img src={previewURL} alt="Original Radiograph" className="max-w-full max-h-[260px] object-contain rounded-lg shadow-md" />
+          </div>
+        </div>
+        
+        {result && result.prediction === 'Pneumonia' && (
+          <div className="bg-[#020408] p-2 rounded-xl border border-red-900/40 flex flex-col items-center justify-center relative overflow-hidden min-h-[260px] sm:min-h-[300px]">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-red-400 mb-1 z-10 self-start px-2 py-0.5 rounded bg-red-950/60 border border-red-800/50 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+              Infection Zone (Grad-CAM)
+            </span>
+            <div className="w-full h-full flex-grow relative flex items-center justify-center">
+              {result.heatmap_url ? (
+                <img 
+                  src={result.heatmap_url} 
+                  alt="Grad-CAM Infection Map" 
+                  className="max-w-full max-h-[260px] object-contain rounded-lg shadow-lg border border-red-500/20" 
+                />
+              ) : (
+                <img 
+                  src={previewURL} 
+                  alt="Radiograph fallback" 
+                  className="max-w-full max-h-[260px] object-contain rounded-lg shadow-lg border border-red-500/20" 
+                />
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {result && (
+        <div className="mt-4 pt-4 border-t border-cyan-900/50 flex-shrink-0 space-y-4">
+           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#020408]/80 p-3 rounded-xl border border-white/5">
+             <DiagnosisBadge prediction={result.prediction} confidence={result.confidence} severity={result.severity} />
+           </div>
+           
+           {/* Clinical Report Section */}
+           {result.summary && (
+             <div>
+                <h4 className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider mb-2 flex items-center gap-2 font-mono">
+                  <Activity size={13} /> Clinical Summary
+                </h4>
+                <p className="text-xs text-gray-300 font-sans mb-3 leading-relaxed">
+                  {result.summary}
+                </p>
+                <div className={`p-3 rounded-lg border ${result.prediction === 'Pneumonia' && (result.severity === 'Severe' || result.severity === 'Critical') ? 'bg-red-500/10 border-red-500/50 text-red-200' : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-200'}`}>
+                  <p className="text-[10px] font-bold uppercase tracking-wider mb-1 opacity-80 font-mono">Recommendation</p>
+                  <p className="text-xs font-sans">{result.suggestion}</p>
+                </div>
+             </div>
+           )}
+        </div>
+      )}
+    </div>
   );
 }

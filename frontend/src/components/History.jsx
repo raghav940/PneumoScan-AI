@@ -3,7 +3,6 @@ import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { History as HistoryIcon, Clock, Activity, ShieldAlert, CheckCircle, X, Shield, Eye, FileText, User } from 'lucide-react';
 import API_BASE from '../utils/api';
-import HeatmapCanvas from './HeatmapCanvas';
 import DiagnosisBadge from './DiagnosisBadge';
 
 export default function History() {
@@ -278,19 +277,11 @@ export default function History() {
                     Grad-CAM Infection Map
                   </span>
                   <div className="w-full h-56 flex items-center justify-center">
-                    {selectedRecord.grad_cam_coordinates ? (
-                      <HeatmapCanvas 
-                        imageUrl={selectedRecord.image_url} 
-                        coordinates={selectedRecord.grad_cam_coordinates} 
-                        className="max-w-full max-h-56 object-contain rounded-lg shadow-lg border border-red-500/20"
-                      />
-                    ) : (
-                      <img 
-                        src={selectedRecord.image_url} 
-                        alt="Scan" 
-                        className="max-w-full max-h-56 object-contain rounded-lg opacity-80"
-                      />
-                    )}
+                    <img 
+                      src={selectedRecord.image_url} 
+                      alt="Grad-CAM Infection Map" 
+                      className="max-w-full max-h-56 object-contain rounded-lg shadow-lg border border-red-500/20"
+                    />
                   </div>
                 </div>
               </div>
