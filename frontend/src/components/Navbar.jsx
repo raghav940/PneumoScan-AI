@@ -42,25 +42,25 @@ export default function Navbar() {
               </div>
               <Link to="/dashboard" className={`${navItem} ${location.pathname === '/dashboard' ? activeNavItem : 'hover:bg-cyan-900/10'}`}>
                 <LayoutDashboard size={16} />
-                HUD
+                Dashboard
               </Link>
               <Link to="/history" className={`${navItem} ${location.pathname === '/history' ? activeNavItem : 'hover:bg-cyan-900/10'}`}>
                 <HistoryIcon size={16} />
-                Logs
+                History
               </Link>
               <button 
                 onClick={handleLogout} 
-                className="ml-2 flex items-center gap-2 bg-red-900/20 hover:bg-red-900/40 text-red-500 hover:text-red-400 font-mono text-xs uppercase tracking-widest px-4 py-2 rounded-xl transition-all shadow-md border border-red-500/30 hover:border-red-500/60"
+                className="ml-2 flex items-center gap-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 hover:text-red-300 font-medium text-xs px-4 py-2 rounded-xl transition-all shadow-md border border-red-500/30 hover:border-red-500/60"
               >
                 <LogOut size={16} />
-                Disconnect
+                Logout
               </button>
             </>
           ) : (
             <>
-              <Link to="/login" className={`${navItem} hover:bg-cyan-900/10`}>Authenticate</Link>
-              <Link to="/register" className="bg-cyan-500 hover:bg-cyan-400 text-black px-6 py-2 rounded-xl font-black font-mono text-xs uppercase tracking-widest transition-all shadow-[0_0_15px_rgba(6,182,212,0.4)] hover:shadow-[0_0_25px_rgba(6,182,212,0.6)] hover:-translate-y-0.5">
-                Initialize
+              <Link to="/login" className={`${navItem} hover:bg-cyan-900/10`}>Login</Link>
+              <Link to="/register" className="bg-cyan-500 hover:bg-cyan-400 text-black px-6 py-2 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-md hover:-translate-y-0.5">
+                Register
               </Link>
             </>
           )}

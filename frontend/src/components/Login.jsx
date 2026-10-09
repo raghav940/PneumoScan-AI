@@ -20,6 +20,7 @@ export default function Login() {
       const res = await axios.post(`${API_BASE}/login`, { username, password });
       localStorage.setItem('token', res.data.access_token);
       localStorage.setItem('username', res.data.username);
+      localStorage.setItem('role', res.data.role || 'user');
       navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.error || 'Authentication sequence failed');
@@ -48,11 +49,11 @@ export default function Login() {
               <Cpu className="text-cyan-500 w-10 h-10 drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
             </div>
           </div>
-          <h2 className="text-2xl font-black text-center text-white mb-2 tracking-widest uppercase neon-text">System Access</h2>
-          <p className="text-center text-cyan-600/80 mb-8 font-mono text-xs uppercase tracking-widest">Authenticate to PneumoScan Network</p>
+          <h2 className="text-2xl font-bold text-center text-white mb-2">Sign In</h2>
+          <p className="text-center text-cyan-500/80 mb-8 text-sm">Sign in to your PneumoScan account</p>
           
           {error && (
-            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="bg-red-900/40 border border-red-500/50 text-red-300 px-4 py-3 rounded-xl text-sm mb-6 shadow-[0_0_15px_rgba(239,68,68,0.2)] text-center font-mono">
+            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="bg-red-900/40 border border-red-500/50 text-red-300 px-4 py-3 rounded-xl text-sm mb-6 text-center font-medium">
               {error}
             </motion.div>
           )}
@@ -61,45 +62,45 @@ export default function Login() {
             <div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="text-cyan-700 h-5 w-5" />
+                  <User className="text-cyan-600 h-5 w-5" />
                 </div>
                 <input 
                   type="text" 
                   value={username} 
                   onChange={e=>setUsername(e.target.value)} 
                   required 
-                  placeholder="IDENTIFIER"
-                  className="w-full pl-10 pr-3 py-3 bg-black/60 border border-cyan-900/50 rounded-xl text-white placeholder-cyan-900 font-mono focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all shadow-inner" 
+                  placeholder="Username"
+                  className="w-full pl-10 pr-3 py-3 bg-black/60 border border-cyan-900/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all shadow-inner" 
                 />
               </div>
             </div>
             <div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="text-cyan-700 h-5 w-5" />
+                  <Lock className="text-cyan-600 h-5 w-5" />
                 </div>
                 <input 
                   type="password" 
                   value={password} 
                   onChange={e=>setPassword(e.target.value)} 
                   required 
-                  placeholder="SECURITY KEY"
-                  className="w-full pl-10 pr-3 py-3 bg-black/60 border border-cyan-900/50 rounded-xl text-white placeholder-cyan-900 font-mono focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all shadow-inner" 
+                  placeholder="Password"
+                  className="w-full pl-10 pr-3 py-3 bg-black/60 border border-cyan-900/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all shadow-inner" 
                 />
               </div>
             </div>
             <motion.button 
-              whileHover={{ scale: 1.02, boxShadow: "0 0 20px rgba(6,182,212,0.4)" }}
+              whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               type="submit" 
               disabled={loading}
-              className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-black uppercase tracking-widest font-mono text-sm py-3 rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all disabled:opacity-70 disabled:cursor-not-allowed border border-cyan-300"
+              className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-sm py-3 rounded-xl shadow-lg transition-all disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              {loading ? 'Authenticating...' : 'Establish Link'}
+              {loading ? 'Signing in...' : 'Sign In'}
             </motion.button>
           </form>
-          <p className="mt-8 text-center text-cyan-700 font-mono text-xs uppercase tracking-widest">
-            Unregistered Entity? <Link to="/register" className="text-cyan-400 font-bold hover:text-cyan-300 drop-shadow-[0_0_5px_rgba(6,182,212,0.5)] transition-colors">Initialize Access</Link>
+          <p className="mt-8 text-center text-gray-400 text-sm">
+            Don't have an account? <Link to="/register" className="text-cyan-400 font-semibold hover:text-cyan-300 transition-colors">Sign Up</Link>
           </p>
         </div>
       </div>

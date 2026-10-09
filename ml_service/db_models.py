@@ -24,5 +24,8 @@ class PredictionRecord(db.Model):
     prediction = db.Column(db.String(50), nullable=False)
     confidence = db.Column(db.Float, nullable=False)
     severity = db.Column(db.String(50), nullable=False)
+    summary = db.Column(db.Text, nullable=True)
+    suggestion = db.Column(db.Text, nullable=True)
+    grad_cam_data = db.Column(db.Text, nullable=True) # Compressed JSON coordinates
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 

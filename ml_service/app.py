@@ -1,5 +1,6 @@
 import os
 import time
+import json
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -167,18 +168,6 @@ def predict():
             # Generate lightweight compressed thumbnail (~3-5 KB) for permanent database preview
             thumbnail_url = generate_compressed_thumbnail(image_bytes)
             
-            # Save metadata to Database
-            record = PredictionRecord(
-                user_id=user_id,
-                image_name=file.filename,
-                image_url=thumbnail_url,
-                prediction=label,
-                confidence=confidence,
-                severity=severity
-            )
-            db.session.add(record)
-            db.session.commit()
-            
             # Clinical Summary and Suggestion Logic
             if severity == "Normal":
                 summary = "No abnormal opacities or consolidations detected in the lung fields. Clear cardiophrenic and costophrenic angles."
@@ -189,6 +178,21 @@ def predict():
             else: # Severe or Critical
                 summary = "Extensive dense consolidations obscuring significant portions of the lung fields, indicative of severe bilateral or lobar pneumonia."
                 suggestion = "URGENT: Recommend immediate hospitalization and aggressive medical intervention. Oxygen therapy and broad-spectrum IV antibiotics may be required."
+
+            # Save full report and coordinates to Database
+            record = PredictionRecord(
+                user_id=user_id,
+                image_name=file.filename,
+                image_url=thumbnail_url,
+                prediction=label,
+                confidence=confidence,
+                severity=severity,
+                summary=summary,
+                suggestion=suggestion,
+                grad_cam_data=json.dumps(heatmap.tolist())
+            )
+            db.session.add(record)
+            db.session.commit()
             
             result = {
                 "id": record.id,
@@ -214,7 +218,7 @@ def history():
     user_id = int(get_jwt_identity())
     current_user = User.query.get(user_id)
     
-    # Admin facility: if admin, allow viewing all records or filtered records
+    # Admin facility: if admin, allow viewing all records with full clinician audit details
     if current_user and getattr(current_user, 'role', 'user') == 'admin':
         records = PredictionRecord.query.order_by(PredictionRecord.created_at.desc()).all()
     else:
@@ -223,14 +227,27 @@ def history():
     results = []
     for r in records:
         uploader = User.query.get(r.user_id) if r.user_id else None
+        
+        # Parse coordinates if available
+        coords = None
+        if getattr(r, 'grad_cam_data', None):
+            try:
+                coords = json.loads(r.grad_cam_data)
+            except Exception:
+                coords = None
+                
         results.append({
             "id": r.id,
             "image_name": getattr(r, 'image_name', None) or 'X-Ray Scan',
             "image_url": getattr(r, 'image_url', None),
             "uploader": uploader.username if uploader else "Anonymous",
+            "uploader_role": getattr(uploader, 'role', 'user') if uploader else 'user',
             "prediction": r.prediction,
             "confidence": r.confidence,
             "severity": r.severity,
+            "summary": getattr(r, 'summary', None) or "Radiograph analysis completed.",
+            "suggestion": getattr(r, 'suggestion', None) or "Clinical correlation recommended.",
+            "grad_cam_coordinates": coords,
             "timestamp": r.created_at.isoformat() + "Z"
         })
         

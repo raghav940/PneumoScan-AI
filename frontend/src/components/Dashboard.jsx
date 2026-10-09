@@ -109,31 +109,68 @@ export default function Dashboard() {
   const renderHeatmap = (heatmapData, scanIndex) => {
     const canvas = scanIndex === 1 ? canvasRef1.current : canvasRef2.current;
     const origImg = scanIndex === 1 ? originalImgRef1.current : originalImgRef2.current;
-    if (!canvas || !origImg) return;
-    
-    const ctx = canvas.getContext('2d');
-    canvas.width = 224;
-    canvas.height = 224;
-    
-    ctx.drawImage(origImg, 0, 0, 224, 224);
-    
-    const imgData = ctx.getImageData(0, 0, 224, 224);
-    const data = imgData.data;
-    
-    for (let y = 0; y < 224; y++) {
-      for (let x = 0; x < 224; x++) {
-        const intensity = heatmapData[y][x]; 
-        const idx = (y * 224 + x) * 4;
-        
-        if (intensity > 0.2) {
-          data[idx] = 255; 
-          data[idx+1] = Math.max(0, 255 * (1 - intensity * 2)); 
-          data[idx+2] = Math.max(0, 255 * (1 - intensity * 3)); 
-          data[idx+3] = Math.min(255, data[idx+3] + intensity * 180); 
+    if (!canvas || !heatmapData) return;
+
+    const draw = () => {
+      const ctx = canvas.getContext('2d');
+      canvas.width = 224;
+      canvas.height = 224;
+
+      if (origImg && origImg.complete && origImg.naturalWidth > 0) {
+        ctx.drawImage(origImg, 0, 0, 224, 224);
+      } else {
+        ctx.fillStyle = '#111827';
+        ctx.fillRect(0, 0, 224, 224);
+      }
+
+      const imgData = ctx.getImageData(0, 0, 224, 224);
+      const data = imgData.data;
+
+      // Vivid Medical Jet / Thermal Colormap
+      for (let y = 0; y < 224; y++) {
+        for (let x = 0; x < 224; x++) {
+          const val = heatmapData[y] ? heatmapData[y][x] : 0;
+          if (val > 0.15) {
+            const idx = (y * 224 + x) * 4;
+            // Normalized intensity between 0 and 1
+            const norm = Math.min(1, Math.max(0, (val - 0.15) / 0.85));
+
+            // Thermal gradient: Blue (low) -> Cyan -> Yellow -> Red (peak consolidation)
+            let r = 0, g = 0, b = 0;
+            if (norm < 0.25) {
+              r = 0;
+              g = Math.floor(255 * (norm / 0.25));
+              b = 255;
+            } else if (norm < 0.5) {
+              r = 0;
+              g = 255;
+              b = Math.floor(255 * (1 - (norm - 0.25) / 0.25));
+            } else if (norm < 0.75) {
+              r = Math.floor(255 * ((norm - 0.5) / 0.25));
+              g = 255;
+              b = 0;
+            } else {
+              r = 255;
+              g = Math.floor(255 * (1 - (norm - 0.75) / 0.25));
+              b = 0;
+            }
+
+            // Alpha blending with base radiograph
+            const alpha = 0.55 + norm * 0.4;
+            data[idx] = Math.floor(data[idx] * (1 - alpha) + r * alpha);
+            data[idx + 1] = Math.floor(data[idx + 1] * (1 - alpha) + g * alpha);
+            data[idx + 2] = Math.floor(data[idx + 2] * (1 - alpha) + b * alpha);
+            data[idx + 3] = 255;
+          }
         }
       }
-    }
-    ctx.putImageData(imgData, 0, 0);
+      ctx.putImageData(imgData, 0, 0);
+    };
+
+    // Draw after DOM paint cycle
+    requestAnimationFrame(draw);
+    setTimeout(draw, 100);
+    setTimeout(draw, 300);
   };
 
   const getSeverityColor = (severity) => {
@@ -192,15 +229,23 @@ export default function Dashboard() {
           <Box size={14} /> {label}
         </h3>
         
-        <div className={`grid gap-4 flex-grow ${result && result.prediction === 'Pneumonia' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-          <div className="bg-[#020408] p-1 rounded-xl border border-cyan-900/30 flex items-center justify-center relative overflow-hidden h-40 sm:h-48">
-             <img ref={originalImgRef} src={previewURL} alt="Original" className="w-full h-full object-cover filter grayscale contrast-125 rounded-lg absolute inset-0 m-1" style={{width: "calc(100% - 8px)", height: "calc(100% - 8px)"}} />
+        <div className={`grid gap-4 flex-grow ${result && result.prediction === 'Pneumonia' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+          <div className="bg-[#020408] p-2 rounded-xl border border-cyan-900/30 flex flex-col items-center justify-center relative overflow-hidden min-h-[260px] sm:min-h-[300px]">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-cyan-400/80 mb-1 z-10 self-start px-2 py-0.5 rounded bg-black/60 border border-cyan-900/50">Raw X-Ray Image</span>
+            <div className="w-full h-full flex-grow relative flex items-center justify-center">
+              <img ref={originalImgRef} src={previewURL} alt="Original Radiograph" className="max-w-full max-h-[260px] object-contain rounded-lg shadow-md" />
+            </div>
           </div>
           
           {result && result.prediction === 'Pneumonia' && (
-            <div className="bg-[#020408] p-1 rounded-xl border border-red-900/30 relative flex items-center justify-center overflow-hidden h-40 sm:h-48">
-              <img src={previewURL} alt="Base" className="w-full h-full object-cover filter grayscale contrast-125 opacity-30 rounded-lg absolute inset-0 m-1" style={{width: "calc(100% - 8px)", height: "calc(100% - 8px)"}} />
-              <canvas ref={canvasRef} className="absolute inset-0 mix-blend-screen w-full h-full rounded-lg m-1" style={{width: "calc(100% - 8px)", height: "calc(100% - 8px)"}}></canvas>
+            <div className="bg-[#020408] p-2 rounded-xl border border-red-900/40 flex flex-col items-center justify-center relative overflow-hidden min-h-[260px] sm:min-h-[300px]">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-red-400 mb-1 z-10 self-start px-2 py-0.5 rounded bg-red-950/60 border border-red-800/50 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                Infection Zone (Grad-CAM)
+              </span>
+              <div className="w-full h-full flex-grow relative flex items-center justify-center">
+                <canvas ref={canvasRef} className="max-w-full max-h-[260px] object-contain rounded-lg shadow-lg border border-red-500/20"></canvas>
+              </div>
             </div>
           )}
         </div>
