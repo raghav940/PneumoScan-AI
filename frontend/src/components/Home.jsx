@@ -37,7 +37,7 @@ export default function Home() {
                 to="/dashboard"
                 className="flex items-center gap-3 bg-cyan-500 hover:bg-cyan-400 text-black px-8 py-3.5 rounded-xl font-bold font-mono text-sm uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:shadow-[0_0_30px_rgba(6,182,212,0.6)] hover:-translate-y-0.5"
               >
-                Access Diagnostic HUD
+                Start Radiograph Scan
                 <ArrowRight size={18} />
               </Link>
             ) : (

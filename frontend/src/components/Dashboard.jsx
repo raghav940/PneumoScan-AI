@@ -298,7 +298,7 @@ export default function Dashboard() {
             <Cpu className="text-cyan-400 bg-cyan-500/10 border border-cyan-500/50 p-2.5 rounded-2xl shadow-md" size={44} />
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-2xl sm:text-3xl font-black text-white tracking-wide">Diagnostic Dashboard</h2>
+                <h2 className="text-2xl sm:text-3xl font-black text-white tracking-wide">Radiograph Scan</h2>
                 {localStorage.getItem('role') === 'admin' && (
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-950/80 border border-purple-500/40 text-purple-300">
                     ADMIN

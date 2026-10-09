@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, User, LayoutDashboard, History as HistoryIcon, Cpu, Shield } from 'lucide-react';
+import { LogOut, User, Scan, History as HistoryIcon, Cpu, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function Navbar() {
@@ -56,8 +56,8 @@ export default function Navbar() {
               </div>
 
               <Link to="/dashboard" className={`${navItem} ${location.pathname === '/dashboard' ? activeNavItem : 'hover:bg-cyan-900/10'}`}>
-                <LayoutDashboard size={15} />
-                Dashboard
+                <Scan size={15} />
+                New Scan
               </Link>
 
               <Link to="/history" className={`${navItem} ${location.pathname === '/history' ? activeNavItem : 'hover:bg-cyan-900/10'}`}>

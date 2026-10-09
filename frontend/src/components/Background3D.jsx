@@ -6,9 +6,9 @@ import * as THREE from 'three';
 function ParticleField() {
   const ref = useRef();
   
-  // Generate random particles
+  // Generate random particles (optimized for smooth 60 FPS)
   const [positions, colors] = useMemo(() => {
-    const count = 3000;
+    const count = 1200;
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
     const color = new THREE.Color();
