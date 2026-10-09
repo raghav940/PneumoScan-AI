@@ -6,15 +6,22 @@ import { motion } from 'framer-motion';
 export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const token = localStorage.getItem('token');
-  const username = localStorage.getItem('username');
-  const role = localStorage.getItem('role') || 'user';
+  const [token, setToken] = React.useState(localStorage.getItem('token'));
+  const [username, setUsername] = React.useState(localStorage.getItem('username'));
+  const [role, setRole] = React.useState(localStorage.getItem('role') || 'user');
+
+  React.useEffect(() => {
+    setToken(localStorage.getItem('token'));
+    setUsername(localStorage.getItem('username'));
+    setRole(localStorage.getItem('role') || 'user');
+  }, [location.pathname]);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
-    localStorage.removeItem('role');
-    navigate('/login');
+    localStorage.clear();
+    setToken(null);
+    setUsername(null);
+    setRole('user');
+    window.location.href = '/login';
   };
 
   const navItem = "flex items-center gap-2 px-3.5 py-1.5 rounded-xl transition-all duration-300 font-mono text-xs uppercase tracking-widest text-cyan-600 hover:text-cyan-300";
