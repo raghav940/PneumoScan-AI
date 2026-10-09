@@ -5,12 +5,22 @@ from contextlib import contextmanager
 
 _pg_pool = None
 
+_DEFAULT_DB_URL = "postgresql://postgres.mliwkpxpfywovphelzbw:VKbPex18VlOvcLHA@aws-0-ap-southeast-2.pooler.supabase.com:5432/postgres"
+
 def get_pool():
     global _pg_pool
     if _pg_pool is None:
-        DATABASE_URL = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URI')
-        if not DATABASE_URL:
-            raise RuntimeError("CRITICAL: DATABASE_URL environment variable is required.")
+        # Load .env if present
+        env_path = os.path.join(os.path.dirname(__file__), '.env')
+        if os.path.exists(env_path):
+            with open(env_path, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        k, v = line.split('=', 1)
+                        os.environ.setdefault(k.strip(), v.strip())
+
+        DATABASE_URL = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URI') or _DEFAULT_DB_URL
         if DATABASE_URL.startswith('postgresql+psycopg2://'):
             DATABASE_URL = DATABASE_URL.replace('postgresql+psycopg2://', 'postgresql://', 1)
         
