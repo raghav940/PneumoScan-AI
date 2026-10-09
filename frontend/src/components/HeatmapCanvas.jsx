@@ -25,9 +25,10 @@ export default function HeatmapCanvas({ imageUrl, coordinates, className = "max-
       for (let y = 0; y < 224; y++) {
         for (let x = 0; x < 224; x++) {
           const val = coordinates[y] ? coordinates[y][x] : 0;
-          if (val > 0.15) {
+          if (val > 0.05) {
             const idx = (y * 224 + x) * 4;
-            const norm = Math.min(1, Math.max(0, (val - 0.15) / 0.85));
+            // Smooth continuous normalization without cliff edge
+            const norm = Math.min(1, Math.max(0, val));
 
             let r = 0, g = 0, b = 0;
             if (norm < 0.25) {
@@ -48,7 +49,8 @@ export default function HeatmapCanvas({ imageUrl, coordinates, className = "max-
               b = 0;
             }
 
-            const alpha = 0.55 + norm * 0.4;
+            // Smooth non-linear alpha: gentle quadratic curve up to 0.55 max opacity
+            const alpha = Math.min(0.55, Math.pow(norm, 1.8) * 0.6);
             data[idx] = Math.floor(data[idx] * (1 - alpha) + r * alpha);
             data[idx + 1] = Math.floor(data[idx + 1] * (1 - alpha) + g * alpha);
             data[idx + 2] = Math.floor(data[idx + 2] * (1 - alpha) + b * alpha);

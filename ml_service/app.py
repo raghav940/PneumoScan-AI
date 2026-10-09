@@ -266,9 +266,13 @@ def predict():
             confidence = float(confidence.item())
             label = "Pneumonia" if label_idx == 1 else "Normal"
 
-        # Layer-4 Grad-CAM Activation Map (requires gradient tracking for target layer)
+        # Layer-4 Grad-CAM Activation Map and Smooth Medical Jet Overlay
         with torch.enable_grad():
-            heatmap = grad_cam.generate(tensor.clone(), target_class=label_idx)
+            heatmap, overlay_url = grad_cam.generate_overlay(
+                tensor.clone(), 
+                target_class=label_idx, 
+                original_image_bytes=image_bytes
+            )
 
         severity = determine_severity(confidence, float(heatmap.max())) if label == "Pneumonia" else "Normal"
         
@@ -310,6 +314,7 @@ def predict():
             "summary": summary,
             "suggestion": suggestion,
             "image_url": thumbnail_url,
+            "heatmap_url": overlay_url,
             "grad_cam_coordinates": heatmap.tolist(),
             "timestamp": ts_str,
             "inference_ms": int((time.time() - start_time) * 1000)

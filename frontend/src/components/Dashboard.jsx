@@ -245,7 +245,15 @@ export default function Dashboard() {
                 Infection Zone (Grad-CAM)
               </span>
               <div className="w-full h-full flex-grow relative flex items-center justify-center">
-                <canvas ref={canvasRef} className="max-w-full max-h-[260px] object-contain rounded-lg shadow-lg border border-red-500/20"></canvas>
+                {result.heatmap_url ? (
+                  <img 
+                    src={result.heatmap_url} 
+                    alt="Grad-CAM Infection Map" 
+                    className="max-w-full max-h-[260px] object-contain rounded-lg shadow-lg border border-red-500/20" 
+                  />
+                ) : (
+                  <canvas ref={canvasRef} className="max-w-full max-h-[260px] object-contain rounded-lg shadow-lg border border-red-500/20"></canvas>
+                )}
               </div>
             </div>
           )}
