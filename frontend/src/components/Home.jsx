@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ShieldCheck, Activity, Database, Eye, ArrowRight } from 'lucide-react';
+import { Canvas } from '@react-three/fiber';
 import LungModel from './LungModel';
 
 export default function Home() {
@@ -87,8 +88,14 @@ export default function Home() {
             <span className="text-[10px] font-mono uppercase tracking-widest text-cyan-300">Interactive Bio-Render</span>
           </div>
 
-          <div className="w-full h-full">
-            <LungModel />
+          <div className="w-full h-full relative">
+            <Suspense fallback={<div className="w-full h-full flex items-center justify-center text-cyan-500/50 font-mono text-xs">INITIALIZING BIO-RENDER...</div>}>
+              <Canvas camera={{ position: [0, 0, 5], fov: 45 }}>
+                <ambientLight intensity={0.6} />
+                <pointLight position={[10, 10, 10]} intensity={1.2} />
+                <LungModel />
+              </Canvas>
+            </Suspense>
           </div>
 
           <div className="absolute bottom-4 left-4 right-4 z-10 bg-[#020408]/80 backdrop-blur-md p-3 rounded-xl border border-cyan-900/40 flex items-center justify-between">
